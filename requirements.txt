@@ -1,0 +1,3 @@
+# Optional. The web app needs none of this.
+# Install only if you want the Chromebook Linux CLI aligner.
+faster-whisper>=1.0.3
