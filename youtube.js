@@ -251,12 +251,18 @@ export async function uploadPackToYoutube(media, copy) {
     return true;
   };
   if ($("ytUpWide")?.checked) {
-    if (!add("16:9 master", media.wide, false) && isWide(media.main)) add("16:9 master", media.main, false);
+    const item = isWide(media.wide) ? media.wide : isWide(media.main) ? media.main : null;
+    if (!add("16:9 landscape", item, false)) {
+      throw new Error("16:9 landscape is checked, but the file in memory is not landscape. Set Aspect to 16:9 and render again.");
+    }
   }
   if ($("ytUpTall")?.checked) {
-    if (!add("9:16 master", media.tall, true) && isTall(media.main) && !isWide(media.main)) add("9:16 master", media.main, true);
+    const item = media.tall || (isTall(media.main) && !isWide(media.main) ? media.main : null);
+    if (!add("9:16 full video", item, false)) {
+      throw new Error("9:16 full video is checked, but that file is not in memory. Render 9:16 or Build release pack.");
+    }
   }
-  if ($("ytUpMain")?.checked) add("current render", media.main, isTall(media.main) && !isWide(media.main));
+  if ($("ytUpMain")?.checked) add("current render", media.main, false);
   if ($("ytUpShorts")?.checked) {
     (media.shorts || []).forEach((s, i) => add(`Short ${s.index || i + 1}`, s, true, s.index || i + 1));
   }
@@ -306,10 +312,21 @@ export async function uploadPackToYoutube(media, copy) {
   return posted;
 }
 
+export function describeYtQueue(media) {
+  const bits = [];
+  if ($("ytUpWide")?.checked) bits.push(media?.wide?.blob || (media?.main && media.main.aspect === "16:9") ? "16:9 landscape" : "16:9 (not rendered yet)");
+  if ($("ytUpTall")?.checked) bits.push(media?.tall?.blob ? "9:16 full video" : "9:16 full (not rendered yet)");
+  if ($("ytUpMain")?.checked) bits.push(media?.main?.blob ? `current render (${media.main.aspect || "?"})` : "current render (none)");
+  if ($("ytUpShorts")?.checked) bits.push(`${(media?.shorts || []).length} Short hook(s)`);
+  const text = bits.length ? `Will upload: ${bits.join(" · ")}` : "Nothing queued. Check one box.";
+  if ($("ytQueueHint")) $("ytQueueHint").textContent = text;
+  return text;
+}
+
 export function initYoutube() {
   loadYtClientId().then(() => ytConnectedLabel());
   if ($("ytSaveClient")) $("ytSaveClient").addEventListener("click", () => saveYtClientId());
   if ($("ytConnect")) $("ytConnect").addEventListener("click", () => connectYoutube());
   if ($("ytDisconnect")) $("ytDisconnect").addEventListener("click", () => disconnectYoutube());
-  if ($("ytOriginHint") && $("ytOriginHint")) $("ytOriginHint").textContent = originList();
+  if ($("ytOriginHint")) $("ytOriginHint").textContent = originList();
 }

@@ -624,11 +624,12 @@
         </label>
       </div>
       <div class="checks">
-        <label><input id="ytUpWide" type="checkbox" checked /> 16:9 master</label>
-        <label><input id="ytUpTall" type="checkbox" checked /> 9:16 master</label>
-        <label><input id="ytUpShorts" type="checkbox" checked /> Shorts</label>
+        <label><input id="ytUpWide" type="checkbox" /> 16:9 landscape only</label>
+        <label><input id="ytUpTall" type="checkbox" /> 9:16 full video only</label>
+        <label><input id="ytUpShorts" type="checkbox" /> Shorts only (hooks)</label>
         <label><input id="ytUpMain" type="checkbox" /> Current render only</label>
       </div>
+      <p id="ytQueueHint" class="hint">Nothing queued. Check one box that matches a file you already rendered.</p>
       <div class="btn-row">
         <button id="ytPost" class="accent" type="button">Post pack to YouTube</button>
       </div>

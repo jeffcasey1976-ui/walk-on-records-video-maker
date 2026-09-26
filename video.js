@@ -1,6 +1,6 @@
 import { state, $, setStatus, setProgress } from "./app.js";
 import { idbGet, idbSet, idbDel, WM_KEY, LOOK_KEY, listLogos, getLogo, putLogo, deleteLogo, newProjectId } from "./projects.js";
-import { initYoutube, uploadPackToYoutube } from "./youtube.js";
+import { initYoutube, uploadPackToYoutube, describeYtQueue } from "./youtube.js";
 
 const videoState = {
   photos: [],
@@ -2826,6 +2826,11 @@ export function initVideoMaker() {
   if ($("saveLook")) $("saveLook").addEventListener("click", () => saveBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("loadLook")) $("loadLook").addEventListener("click", () => loadBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
   initYoutube();
+  const paintYtQueue = () => describeYtQueue(releaseMedia());
+  ["ytUpWide", "ytUpTall", "ytUpShorts", "ytUpMain"].forEach((id) => {
+    if ($(id)) $(id).addEventListener("change", paintYtQueue);
+  });
+  paintYtQueue();
   if ($("ytPost")) $("ytPost").addEventListener("click", () => postReleaseToYoutube());
   if ($("releaseDesk")) $("releaseDesk").addEventListener("click", () => buildReleaseDesk().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("releaseZipOnly")) $("releaseZipOnly").addEventListener("click", () => downloadCopyZip().catch((e) => setStatus(String(e.message || e), "error")));
