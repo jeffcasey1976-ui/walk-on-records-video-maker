@@ -240,18 +240,21 @@ export async function uploadPackToYoutube(media, copy) {
   if (!tokenValid()) await getToken(true);
   const privacy = $("ytPrivacy")?.value || "unlisted";
   const jobs = [];
-  if ($("ytUpWide")?.checked && media.wide?.blob) jobs.push({ kind: "16:9 master", blob: media.wide.blob, short: false });
-  if ($("ytUpTall")?.checked && media.tall?.blob) jobs.push({ kind: "9:16 master", blob: media.tall.blob, short: true });
-  if ($("ytUpMain")?.checked && media.main?.blob && !media.wide?.blob && !media.tall?.blob) {
-    jobs.push({ kind: "current render", blob: media.main.blob, short: false });
-  }
+  const used = new Set();
+  const add = (kind, blob, short, index) => {
+    if (!blob || used.has(blob)) return;
+    used.add(blob);
+    jobs.push({ kind, blob, short: !!short, index });
+  };
+  if ($("ytUpWide")?.checked) add("16:9 master", media.wide?.blob || null, false);
+  if ($("ytUpTall")?.checked) add("9:16 master", media.tall?.blob || null, true);
+  if ($("ytUpMain")?.checked) add("current render", media.main?.blob || null, false);
+  if (!jobs.length && media.main?.blob) add("current render", media.main.blob, false);
   if ($("ytUpShorts")?.checked) {
-    (media.shorts || []).forEach((s, i) => {
-      if (s?.blob) jobs.push({ kind: `Short ${s.index || i + 1}`, blob: s.blob, short: true, index: s.index || i + 1 });
-    });
+    (media.shorts || []).forEach((s, i) => add(`Short ${s.index || i + 1}`, s?.blob, true, s.index || i + 1));
   }
   if (!jobs.length) {
-    throw new Error("Nothing to upload. Render or Build release pack first, then check which files to post.");
+    throw new Error("Nothing in memory to upload. Render in background (or Build release pack), wait until Download video is on, then Post again.");
   }
 
   const title = clip(copy.title, 100);
