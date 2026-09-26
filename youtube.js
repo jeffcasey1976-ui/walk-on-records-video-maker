@@ -241,8 +241,9 @@ export async function uploadPackToYoutube(media, copy) {
   const privacy = $("ytPrivacy")?.value || "unlisted";
   const jobs = [];
   const used = new Set();
-  const isWide = (item) => item && (item.aspect === "16:9" || (item.w && item.h && item.w > item.h));
-  const isTall = (item) => item && (item.aspect === "9:16" || item.short || (item.w && item.h && item.h > item.w));
+  const looksShort = (item) => !!(item?.short || /short/i.test(item?.name || ""));
+  const isWide = (item) => item && !looksShort(item) && (item.aspect === "16:9" || (item.w && item.h && item.w > item.h));
+  const isTall = (item) => item && !looksShort(item) && (item.aspect === "9:16" || (item.w && item.h && item.h > item.w));
   const add = (kind, item, short, index) => {
     const blob = item?.blob;
     if (!blob || used.has(blob)) return false;
@@ -273,7 +274,7 @@ export async function uploadPackToYoutube(media, copy) {
     const shape = j.item?.aspect || (j.short ? "9:16" : "video");
     const mb = (j.blob.size / 1e6).toFixed(1);
     const warn = j.short && j.item?.duration > 180 ? " (over 3 min — YouTube may put this in Videos, not Shorts)" : "";
-    return `• ${j.kind} · ${shape} · ${mb} MB${warn}`;
+    return `• ${j.kind} · ${j.item?.name || "file"} · ${shape} · ${mb} MB${warn}`;
   }).join("\n");
   const ok = window.confirm(`Upload ${jobs.length} file(s) as ${privacy}?\n\n${preview}\n\nYouTube puts a file in Shorts only if it is vertical and about 3 minutes or less. A 16:9 master should land in Videos.`);
   if (!ok) throw new Error("Upload cancelled.");
