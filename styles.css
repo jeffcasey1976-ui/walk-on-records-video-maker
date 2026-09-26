@@ -299,6 +299,8 @@ input[type="number"] { width: 100%; max-width: 140px; }
 .review-bar input[type="range"] { flex: 1; min-width: 140px; accent-color: var(--accent-2); }
 .review-bar .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.82rem; }
 .review-bar button { padding: 7px 10px; font-size: 0.78rem; }
+textarea.release-copy { min-height: 140px; margin-top: 0; }
+textarea.release-copy.short-copy { min-height: 72px; }
 
 @media (max-width: 860px) {
   .grid { grid-template-columns: 1fr; }

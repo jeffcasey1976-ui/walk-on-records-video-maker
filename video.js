@@ -24,9 +24,11 @@ const videoState = {
   shorts: [],
   scrubbing: false,
   stripDrag: null,
+  releaseRoot: null,
+  masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "21";
+export const APP_REV = "22";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1519,12 +1521,12 @@ function applyLookPreset(name) {
 }
 
 function slugName() {
-  return (introMeta().title || $("projectName")?.value || state.fileName || "release")
-    .replace(/[^\w.-]+/g, "_")
-    .slice(0, 40);
+  const typed = ($("releaseFolder")?.value || "").trim();
+  const raw = typed || introMeta().title || $("projectName")?.value || state.fileName || "release";
+  return raw.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48) || "release";
 }
 
-function releaseCopy() {
+function defaultReleaseParts() {
   const title = introMeta().title || $("projectName")?.value || state.fileName || "New single";
   const artist = introMeta().artist || "Walk On Records";
   const album = introMeta().album;
@@ -1550,18 +1552,88 @@ function releaseCopy() {
   ]
     .filter(Boolean)
     .map((t) => (t.startsWith("#") ? t : "#" + t));
-  return [
-    title,
-    "",
-    `${title} — ${artist}${album ? " | " + album : ""}`,
-    "",
-    "Official lyric video from Walk On Records.",
-    "",
-    "Chapters",
-    chapters.join("\n") || "00:00 Start",
-    "",
-    tags.join(" "),
-  ].join("\n");
+  return {
+    title: `${title} — ${artist}`,
+    description: [
+      `${title} — ${artist}${album ? " | " + album : ""}`,
+      "",
+      "Official lyric video from Walk On Records.",
+      "",
+      "Stream / follow:",
+      "Walk On Records",
+    ].join("\n"),
+    chapters: chapters.join("\n") || "00:00 Start",
+    hashtags: tags.join(" "),
+  };
+}
+
+function readReleaseParts() {
+  const gen = defaultReleaseParts();
+  return {
+    title: ($("ytTitle")?.value || "").trim() || gen.title,
+    description: ($("ytDescription")?.value || "").trim() || gen.description,
+    chapters: ($("ytChapters")?.value || "").trim() || gen.chapters,
+    hashtags: ($("ytHashtags")?.value || "").trim() || gen.hashtags,
+  };
+}
+
+function fillReleaseFields(force) {
+  const gen = defaultReleaseParts();
+  if ($("ytTitle") && (force || !$("ytTitle").value.trim())) $("ytTitle").value = gen.title;
+  if ($("ytDescription") && (force || !$("ytDescription").value.trim())) $("ytDescription").value = gen.description;
+  if ($("ytChapters") && (force || !$("ytChapters").value.trim())) $("ytChapters").value = gen.chapters;
+  if ($("ytHashtags") && (force || !$("ytHashtags").value.trim())) $("ytHashtags").value = gen.hashtags;
+  if ($("releaseFolder") && !$("releaseFolder").value.trim()) $("releaseFolder").value = slugName();
+}
+
+function releaseCopy() {
+  const p = readReleaseParts();
+  return [p.title, "", p.description, "", "Chapters", p.chapters, "", p.hashtags].join("\n");
+}
+
+const DESC_LIB_KEY = "release-desc-lib";
+const TAG_LIB_KEY = "release-tag-lib";
+
+async function loadCopyLib(key) {
+  const rows = await idbGet(key);
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function refreshCopyLibs() {
+  const desc = await loadCopyLib(DESC_LIB_KEY);
+  const tags = await loadCopyLib(TAG_LIB_KEY);
+  const fill = (id, rows, empty) => {
+    const sel = $(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${empty}</option>` + rows.map((r) => `<option value="${r.id}">${escapeChip(r.name)}</option>`).join("");
+    if (cur && rows.some((r) => r.id === cur)) sel.value = cur;
+  };
+  fill("ytDescLib", desc, "Saved descriptions…");
+  fill("ytTagLib", tags, "Saved hashtags…");
+}
+
+async function saveCopyLib(key, name, text) {
+  const label = (name || "").trim();
+  const body = (text || "").trim();
+  if (!label || !body) return setStatus("Need a name and some text to save.", "error");
+  const rows = await loadCopyLib(key);
+  const existing = rows.find((r) => r.name.toLowerCase() === label.toLowerCase());
+  if (existing) existing.text = body;
+  else rows.push({ id: newProjectId(), name: label, text: body, updated: Date.now() });
+  await idbSet(key, rows);
+  await refreshCopyLibs();
+  setStatus(`Saved “${label}”.`, "ok");
+}
+
+async function applyCopyLib(key, selectId, targetId) {
+  const id = $(selectId)?.value;
+  if (!id) return setStatus("Pick a saved item first.", "error");
+  const rows = await loadCopyLib(key);
+  const hit = rows.find((r) => r.id === id);
+  if (!hit) return setStatus("That saved item is gone.", "error");
+  if ($(targetId)) $(targetId).value = hit.text;
+  setStatus(`Loaded “${hit.name}”.`, "ok");
 }
 
 async function snapshotThumbs() {
@@ -1581,9 +1653,134 @@ async function snapshotThumbs() {
     const t = wins[i]?.start || 0;
     drawFrame(ctx, canvas.width, canvas.height, t);
     const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.9));
-    if (blob) out.push({ blob, name: `${slugName()}-thumb-${i + 1}.jpg` });
+    if (blob) out.push({ blob, name: `thumb-${i + 1}.jpg` });
   }
   return out;
+}
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c;
+  }
+  return t;
+})();
+
+function crc32Bytes(u8) {
+  let c = 0xffffffff;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function le32(n) {
+  const b = new Uint8Array(4);
+  new DataView(b.buffer).setUint32(0, n >>> 0, true);
+  return b;
+}
+
+function le16(n) {
+  const b = new Uint8Array(2);
+  new DataView(b.buffer).setUint16(0, n & 0xffff, true);
+  return b;
+}
+
+async function makeZip(entries) {
+  const chunks = [];
+  const centrals = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const name = String(entry.path || "file").replace(/\\/g, "/");
+    const nameBytes = new TextEncoder().encode(name);
+    const data = entry.blob
+      ? new Uint8Array(await entry.blob.arrayBuffer())
+      : new TextEncoder().encode(entry.text || "");
+    const crc = crc32Bytes(data);
+    const local = new Blob([
+      new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+      le16(20), le16(0), le16(0), le16(0), le16(0),
+      le32(crc), le32(data.length), le32(data.length),
+      le16(nameBytes.length), le16(0),
+      nameBytes, data,
+    ]);
+    chunks.push(local);
+    centrals.push(new Blob([
+      new Uint8Array([0x50, 0x4b, 0x01, 0x02]),
+      le16(20), le16(20), le16(0), le16(0), le16(0), le16(0),
+      le32(crc), le32(data.length), le32(data.length),
+      le16(nameBytes.length), le16(0), le16(0), le16(0), le16(0), le32(0),
+      le32(offset), nameBytes,
+    ]));
+    offset += 30 + nameBytes.length + data.length;
+  }
+  const centralBlob = new Blob(centrals);
+  const end = new Blob([
+    new Uint8Array([0x50, 0x4b, 0x05, 0x06]),
+    le16(0), le16(0), le16(entries.length), le16(entries.length),
+    le32(centralBlob.size), le32(offset), le16(0),
+  ]);
+  return new Blob([...chunks, centralBlob, end], { type: "application/zip" });
+}
+
+async function pickReleaseRoot() {
+  if (!window.showDirectoryPicker) {
+    return setStatus("This browser cannot pick a folder. The pack will download as a zip instead.", "error");
+  }
+  try {
+    videoState.releaseRoot = await window.showDirectoryPicker({ mode: "readwrite", id: "wor-release" });
+    if ($("releaseFolderPath")) $("releaseFolderPath").textContent = `Parent: ${videoState.releaseRoot.name}`;
+    setStatus(`Releases will go in a subfolder under “${videoState.releaseRoot.name}”.`, "ok");
+  } catch (err) {
+    if (err?.name !== "AbortError") setStatus("Could not open that folder.", "error");
+  }
+}
+
+async function writeDirFile(root, parts, data) {
+  let dir = root;
+  for (let i = 0; i < parts.length - 1; i++) {
+    dir = await dir.getDirectoryHandle(parts[i], { create: true });
+  }
+  const file = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+  const w = await file.createWritable();
+  await w.write(data);
+  await w.close();
+}
+
+function youtubeEntries(parts, folder) {
+  return [
+    { path: `${folder}/youtube/title.txt`, text: parts.title + "\n" },
+    { path: `${folder}/youtube/description.txt`, text: parts.description + "\n" },
+    { path: `${folder}/youtube/chapters.txt`, text: parts.chapters + "\n" },
+    { path: `${folder}/youtube/hashtags.txt`, text: parts.hashtags + "\n" },
+    { path: `${folder}/youtube/full-listing.txt`, text: releaseCopy() + "\n" },
+  ];
+}
+
+async function writeReleaseEntries(entries) {
+  if (videoState.releaseRoot) {
+    for (const e of entries) {
+      const rel = e.path.split("/").filter(Boolean);
+      await writeDirFile(videoState.releaseRoot, rel, e.blob || e.text || "");
+    }
+    return "folder";
+  }
+  const zip = await makeZip(entries);
+  downloadBlob(`${slugName()}-release.zip`, zip);
+  return "zip";
+}
+
+async function downloadCopyZip() {
+  fillReleaseFields(false);
+  const folder = slugName();
+  const parts = readReleaseParts();
+  const thumbs = await snapshotThumbs();
+  const entries = [
+    ...youtubeEntries(parts, folder),
+    ...thumbs.map((th) => ({ path: `${folder}/thumbnails/${th.name}`, blob: th.blob })),
+  ];
+  const how = await writeReleaseEntries(entries);
+  setStatus(how === "folder" ? `Wrote youtube + thumbs under ${folder}.` : "Downloaded youtube + thumbs zip.", "ok");
 }
 
 async function buildReleaseDesk() {
@@ -1591,28 +1788,53 @@ async function buildReleaseDesk() {
   if (!hasBackground() || !(state.audioBuffer || (state.duration && $("player").src))) {
     return setStatus("Need audio plus photos, a loop, or a visualizer first.", "error");
   }
-  const copy = releaseCopy();
-  downloadBlob(`${slugName()}-youtube.txt`, new Blob([copy], { type: "text/plain" }));
+  fillReleaseFields(false);
+  const folder = slugName();
+  const parts = readReleaseParts();
   const thumbs = await snapshotThumbs();
-  thumbs.forEach((th) => downloadBlob(th.name, th.blob));
-  setStatus("Release copy and 3 thumbnails downloaded. Rendering 16:9, then 9:16, then Shorts…", "ok");
+  const textEntries = [
+    ...youtubeEntries(parts, folder),
+    ...thumbs.map((th) => ({ path: `${folder}/thumbnails/${th.name}`, blob: th.blob })),
+  ];
+  if (videoState.releaseRoot) await writeReleaseEntries(textEntries);
+  setStatus("YouTube text and 3 thumbnails ready. Rendering 16:9, then 9:16, then Shorts…", "ok");
   const aspectEl = $("aspect");
   const prev = aspectEl.value;
+  const videos = [];
   aspectEl.value = "16:9";
   sizePreviewCanvas();
-  await renderVideo({ batch: true });
+  const wide = await renderVideo({ batch: true });
+  if (wide?.blob) {
+    videoState.masters.wide = wide;
+    videos.push({ path: `${folder}/video/master-16x9.${extForMime(wide.mime || wide.blob.type)}`, blob: wide.blob });
+  }
   if (videoState.cancel) {
     aspectEl.value = prev;
+    sizePreviewCanvas();
     return;
   }
   aspectEl.value = "9:16";
   sizePreviewCanvas();
-  await renderVideo({ batch: true });
+  const tall = await renderVideo({ batch: true });
+  if (tall?.blob) {
+    videoState.masters.tall = tall;
+    videos.push({ path: `${folder}/video/master-9x16.${extForMime(tall.mime || tall.blob.type)}`, blob: tall.blob });
+  }
   aspectEl.value = prev;
   sizePreviewCanvas();
   const dur = mediaDuration();
   if (dur > 120 && !videoState.cancel) await renderAutoShorts();
-  setStatus("Release desk finished. Download main video and each Short. YouTube text and thumbs already saved.", "ok");
+  (videoState.shorts || []).forEach((s, i) => {
+    if (s?.blob) videos.push({ path: `${folder}/video/short-${s.index || i + 1}-9x16.${extForMime(s.blob.type)}`, blob: s.blob });
+  });
+  if (videoState.releaseRoot) {
+    if (videos.length) await writeReleaseEntries(videos);
+    setStatus(`Release pack written to ${videoState.releaseRoot.name}/${folder}/ (youtube, thumbnails, video).`, "ok");
+  } else {
+    const zip = await makeZip([...textEntries, ...videos]);
+    downloadBlob(`${folder}-release.zip`, zip);
+    setStatus(`Downloaded ${folder}-release.zip with youtube/, thumbnails/, and video/.`, "ok");
+  }
 }
 
 export function applySettings(settings) {
@@ -2570,7 +2792,49 @@ export function initVideoMaker() {
   }
   if ($("saveLook")) $("saveLook").addEventListener("click", () => saveBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("loadLook")) $("loadLook").addEventListener("click", () => loadBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
-  if ($("releaseDesk")) $("releaseDesk").addEventListener("click", () => buildReleaseDesk());
+  if ($("releaseDesk")) $("releaseDesk").addEventListener("click", () => buildReleaseDesk().catch((e) => setStatus(String(e.message || e), "error")));
+  if ($("releaseZipOnly")) $("releaseZipOnly").addEventListener("click", () => downloadCopyZip().catch((e) => setStatus(String(e.message || e), "error")));
+  if ($("releasePickFolder")) $("releasePickFolder").addEventListener("click", () => pickReleaseRoot());
+  if ($("ytDescLoad")) $("ytDescLoad").addEventListener("click", () => applyCopyLib(DESC_LIB_KEY, "ytDescLib", "ytDescription"));
+  if ($("ytTagLoad")) $("ytTagLoad").addEventListener("click", () => applyCopyLib(TAG_LIB_KEY, "ytTagLib", "ytHashtags"));
+  if ($("ytDescSave")) {
+    $("ytDescSave").addEventListener("click", () => {
+      const name = window.prompt("Name this description", introMeta().title || "Description");
+      if (name) saveCopyLib(DESC_LIB_KEY, name, $("ytDescription")?.value);
+    });
+  }
+  if ($("ytTagSave")) {
+    $("ytTagSave").addEventListener("click", () => {
+      const name = window.prompt("Name this hashtag set", "Walk On Records tags");
+      if (name) saveCopyLib(TAG_LIB_KEY, name, $("ytHashtags")?.value);
+    });
+  }
+  if ($("ytDescUpload") && $("ytDescFile")) {
+    $("ytDescUpload").addEventListener("click", () => $("ytDescFile").click());
+    $("ytDescFile").addEventListener("change", async () => {
+      const f = $("ytDescFile").files?.[0];
+      if (!f) return;
+      $("ytDescription").value = await f.text();
+      $("ytDescFile").value = "";
+      setStatus("Description loaded from file.", "ok");
+    });
+  }
+  if ($("ytTagUpload") && $("ytTagFile")) {
+    $("ytTagUpload").addEventListener("click", () => $("ytTagFile").click());
+    $("ytTagFile").addEventListener("change", async () => {
+      const f = $("ytTagFile").files?.[0];
+      if (!f) return;
+      $("ytHashtags").value = await f.text();
+      $("ytTagFile").value = "";
+      setStatus("Hashtags loaded from file.", "ok");
+    });
+  }
+  if ($("ytDescCopy")) $("ytDescCopy").addEventListener("click", () => navigator.clipboard.writeText($("ytDescription")?.value || "").then(() => setStatus("Description copied.", "ok")));
+  if ($("ytTagCopy")) $("ytTagCopy").addEventListener("click", () => navigator.clipboard.writeText($("ytHashtags")?.value || "").then(() => setStatus("Hashtags copied.", "ok")));
+  if ($("ytDescFill")) $("ytDescFill").addEventListener("click", () => { fillReleaseFields(true); setStatus("Filled title, description, chapters from this song.", "ok"); });
+  if ($("ytTagFill")) $("ytTagFill").addEventListener("click", () => { const g = defaultReleaseParts(); $("ytHashtags").value = g.hashtags; setStatus("Filled default hashtags.", "ok"); });
+  refreshCopyLibs().catch(() => {});
+  fillReleaseFields(false);
   if ($("vizMic")) $("vizMic").addEventListener("click", () => startMicPreview());
   if ($("vizMicOff")) $("vizMicOff").addEventListener("click", () => stopMicPreview());
   if ($("vizFull")) {
@@ -2671,7 +2935,7 @@ export function initVideoMaker() {
     setStatus("Watermark removed (including the saved copy).");
   });
 
-  ["aspect", "quality", "photoHold", "photoFade", "photoTrans", "photoMotion", "photoMotionAmt", "photoEven", "vizMode", "vizPlace", "vizTheme", "vizSens", "karaokeStyle", "safeZone", "textLook", "lyricPreset", "lyricTop", "lyricHeight", "lyricWidth", "lyricAlign", "lyricShade", "lyricFont", "songTitle", "songArtist", "songAlbum", "titleFont", "titleSize", "introSec", "introDim", "endSec", "endText", "endPos", "endSize", "endX", "endY", "endTextPos", "endDim", "titleFloat", "shortStart", "shortEnd", "wmSize", "wmOpacity", "wmPos"].forEach((id) => {
+  ["aspect", "quality", "photoHold", "photoFade", "photoTrans", "photoMotion", "photoMotionAmt", "photoEven", "vizMode", "vizPlace", "vizTheme", "vizSens", "karaokeStyle", "safeZone", "textLook", "lyricPreset", "lyricTop", "lyricHeight", "lyricWidth", "lyricAlign", "lyricShade", "lyricFont", "songTitle", "songArtist", "songAlbum", "titleFont", "titleSize", "introSec", "introDim", "endSec", "endText", "endPos", "endSize", "endX", "endY", "endTextPos", "endDim", "titleFloat", "shortStart", "shortEnd", "wmSize", "wmOpacity", "wmPos", "ytTitle", "ytDescription", "ytChapters", "ytHashtags", "releaseFolder"].forEach((id) => {
     const el = $(id);
     if (!el) return;
     const refresh = () => {

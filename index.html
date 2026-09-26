@@ -16,7 +16,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 21 · 2026-09-26</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 22 · 2026-09-26</span></h1>
         <p>Best path: CapCut SRT for times + your lyrics for words. Then turn the timed lines into a 9:16 or 16:9 lyric video.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -558,9 +558,45 @@
       <div id="shortDownloads" class="btn-row"></div>
 
       <h3 class="subhead">Release desk</h3>
-      <p class="hint" style="margin-top:0">One click downloads YouTube title / description / chapters / hashtags, three thumbnail stills, then renders a 16:9 master, a 9:16 master, and 3 Shorts if the song is over 2 minutes. Leave this tab open.</p>
+      <p class="hint" style="margin-top:0">Picks or makes a folder named after the song, then writes <code>youtube/</code>, <code>thumbnails/</code>, and <code>video/</code> inside it. One click: title, description, chapters, hashtags, 3 stills, 16:9 master, 9:16 master, and 3 Shorts if the song is over 2 minutes. Chrome on a Chromebook can write the folders. Other browsers get one zip with the same tree. Leave this tab open.</p>
+      <div class="row video-opts">
+        <label>Release folder name
+          <input id="releaseFolder" type="text" placeholder="Artist_Title" />
+        </label>
+      </div>
+      <div class="btn-row">
+        <button id="releasePickFolder" class="secondary" type="button">Choose parent folder</button>
+        <span id="releaseFolderPath" class="file-name"></span>
+      </div>
+      <label for="ytTitle">YouTube title</label>
+      <input id="ytTitle" type="text" style="width:100%;max-width:none" placeholder="Song Title — Artist" />
+      <label for="ytDescription">Description</label>
+      <textarea id="ytDescription" class="release-copy" placeholder="Paste or write the YouTube description"></textarea>
+      <div class="btn-row">
+        <select id="ytDescLib"></select>
+        <button id="ytDescLoad" class="secondary" type="button">Load saved</button>
+        <button id="ytDescSave" class="secondary" type="button">Save this description</button>
+        <button id="ytDescUpload" class="ghost" type="button">Upload .txt</button>
+        <button id="ytDescCopy" class="ghost" type="button">Copy</button>
+        <button id="ytDescFill" class="ghost" type="button">Fill from title</button>
+      </div>
+      <input id="ytDescFile" type="file" accept=".txt,text/plain" hidden />
+      <label for="ytChapters">Chapters</label>
+      <textarea id="ytChapters" class="release-copy short-copy" placeholder="00:00 Start"></textarea>
+      <label for="ytHashtags">Hashtags</label>
+      <textarea id="ytHashtags" class="release-copy short-copy" placeholder="#WalkOnRecords #LyricVideo"></textarea>
+      <div class="btn-row">
+        <select id="ytTagLib"></select>
+        <button id="ytTagLoad" class="secondary" type="button">Load saved</button>
+        <button id="ytTagSave" class="secondary" type="button">Save these hashtags</button>
+        <button id="ytTagUpload" class="ghost" type="button">Upload .txt</button>
+        <button id="ytTagCopy" class="ghost" type="button">Copy</button>
+        <button id="ytTagFill" class="ghost" type="button">Fill defaults</button>
+      </div>
+      <input id="ytTagFile" type="file" accept=".txt,text/plain" hidden />
       <div class="btn-row">
         <button id="releaseDesk" class="accent" type="button">Build release pack</button>
+        <button id="releaseZipOnly" class="secondary" type="button">Download youtube + thumbs zip</button>
       </div>
       <div class="btn-row">
         <button id="previewVideo" class="secondary" type="button" disabled>Live preview</button>
