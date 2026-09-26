@@ -11,12 +11,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 22 · 2026-09-26</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 23 · 2026-09-26</span></h1>
         <p>Best path: CapCut SRT for times + your lyrics for words. Then turn the timed lines into a 9:16 or 16:9 lyric video.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -598,6 +599,40 @@
         <button id="releaseDesk" class="accent" type="button">Build release pack</button>
         <button id="releaseZipOnly" class="secondary" type="button">Download youtube + thumbs zip</button>
       </div>
+
+      <h3 class="subhead">Post to YouTube</h3>
+      <p class="hint" style="margin-top:0">Uploads from this browser to a channel you pick. Default is <b>unlisted</b> — you publish in Studio. Client ID and tokens stay in this browser, not on GitHub. Add this exact origin in Google Cloud → OAuth client → Authorized JavaScript origins: <code id="ytOriginHint"></code></p>
+      <label>Google OAuth Client ID
+        <input id="ytClientId" type="text" style="width:100%;max-width:none" placeholder="123456789-abc.apps.googleusercontent.com" autocomplete="off" />
+      </label>
+      <div class="btn-row">
+        <button id="ytSaveClient" class="secondary" type="button">Save Client ID</button>
+        <button id="ytConnect" type="button">Connect YouTube</button>
+        <button id="ytDisconnect" class="ghost" type="button">Disconnect</button>
+        <span id="ytAuthState" class="file-name">Not connected.</span>
+      </div>
+      <div class="row video-opts">
+        <label>Channel
+          <select id="ytChannel"><option value="">Connect first</option></select>
+        </label>
+        <label>Privacy
+          <select id="ytPrivacy">
+            <option value="unlisted" selected>Unlisted (recommended)</option>
+            <option value="private">Private</option>
+            <option value="public">Public</option>
+          </select>
+        </label>
+      </div>
+      <div class="checks">
+        <label><input id="ytUpWide" type="checkbox" checked /> 16:9 master</label>
+        <label><input id="ytUpTall" type="checkbox" checked /> 9:16 master</label>
+        <label><input id="ytUpShorts" type="checkbox" checked /> Shorts</label>
+        <label><input id="ytUpMain" type="checkbox" /> Current render only</label>
+      </div>
+      <div class="btn-row">
+        <button id="ytPost" class="accent" type="button">Post pack to YouTube</button>
+      </div>
+      <pre id="ytPostLog" class="hint" style="white-space:pre-wrap"></pre>
       <div class="btn-row">
         <button id="previewVideo" class="secondary" type="button" disabled>Live preview</button>
         <button id="renderVideo" type="button" disabled>Render in background</button>

@@ -1,5 +1,6 @@
 import { state, $, setStatus, setProgress } from "./app.js";
 import { idbGet, idbSet, idbDel, WM_KEY, LOOK_KEY, listLogos, getLogo, putLogo, deleteLogo, newProjectId } from "./projects.js";
+import { initYoutube, uploadPackToYoutube } from "./youtube.js";
 
 const videoState = {
   photos: [],
@@ -28,7 +29,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "22";
+export const APP_REV = "23";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1567,7 +1568,7 @@ function defaultReleaseParts() {
   };
 }
 
-function readReleaseParts() {
+export function readReleaseParts() {
   const gen = defaultReleaseParts();
   return {
     title: ($("ytTitle")?.value || "").trim() || gen.title,
@@ -1965,6 +1966,27 @@ function setMainResult(blob, name, mime) {
 function setRenderResult(blob, name, mime, asShort) {
   if (asShort) return;
   setMainResult(blob, name, mime);
+}
+
+export function releaseMedia() {
+  return {
+    wide: videoState.masters.wide,
+    tall: videoState.masters.tall,
+    main: videoState.main || videoState.result,
+    shorts: videoState.shorts || [],
+  };
+}
+
+export async function postReleaseToYoutube() {
+  try {
+    const media = releaseMedia();
+    const posted = await uploadPackToYoutube(media, readReleaseParts());
+    const lines = posted.map((p) => `${p.kind}: ${p.url || p.id}`).join(" · ");
+    setStatus(`Posted ${posted.length} file(s) as ${$("ytPrivacy")?.value || "unlisted"}. ${lines}`, "ok");
+    if ($("ytPostLog")) $("ytPostLog").textContent = posted.map((p) => `${p.kind}\n${p.url}`).join("\n\n");
+  } catch (err) {
+    setStatus(String(err.message || err), "error");
+  }
 }
 
 export function downloadRender() {
@@ -2792,6 +2814,8 @@ export function initVideoMaker() {
   }
   if ($("saveLook")) $("saveLook").addEventListener("click", () => saveBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("loadLook")) $("loadLook").addEventListener("click", () => loadBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
+  initYoutube();
+  if ($("ytPost")) $("ytPost").addEventListener("click", () => postReleaseToYoutube());
   if ($("releaseDesk")) $("releaseDesk").addEventListener("click", () => buildReleaseDesk().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("releaseZipOnly")) $("releaseZipOnly").addEventListener("click", () => downloadCopyZip().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("releasePickFolder")) $("releasePickFolder").addEventListener("click", () => pickReleaseRoot());
