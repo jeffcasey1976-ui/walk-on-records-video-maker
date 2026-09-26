@@ -1954,18 +1954,18 @@ export function clearRenderResult() {
   updateDownloadButtons();
 }
 
-function setMainResult(blob, name, mime) {
+function setMainResult(blob, name, mime, extra) {
   if (videoState.mainUrl) URL.revokeObjectURL(videoState.mainUrl);
-  videoState.main = { blob, name, mime: mime || blob.type };
+  videoState.main = { blob, name, mime: mime || blob.type, ...(extra || {}) };
   videoState.mainUrl = URL.createObjectURL(blob);
   videoState.result = videoState.main;
   videoState.resultUrl = videoState.mainUrl;
   updateDownloadButtons();
 }
 
-function setRenderResult(blob, name, mime, asShort) {
+function setRenderResult(blob, name, mime, asShort, extra) {
   if (asShort) return;
-  setMainResult(blob, name, mime);
+  setMainResult(blob, name, mime, extra);
 }
 
 export function releaseMedia() {
@@ -2778,7 +2778,18 @@ async function renderVideo(opts = {}) {
   const ext = extForMime(outMime);
   const tag = `${pack ? `short${opts.index ? "-" + opts.index : ""}-9x16` : $("aspect").value.replace(":", "x")}${amount < 1 ? `-draft${Math.round(amount * 100)}` : ""}`;
   const name = `${state.fileName || "video"}-${tag}.${ext}`;
-  setRenderResult(blob, name, outMime, !!opts.short);
+  const extra = {
+    aspect: pack ? "9:16" : $("aspect")?.value || "9:16",
+    w,
+    h,
+    duration,
+    short: !!pack,
+  };
+  setRenderResult(blob, name, outMime, !!opts.short, extra);
+  if (opts.batch && !opts.short) {
+    if (extra.aspect === "16:9") videoState.masters.wide = { blob, name, mime: outMime, ...extra };
+    if (extra.aspect === "9:16") videoState.masters.tall = { blob, name, mime: outMime, ...extra };
+  }
   if (opts.short && !opts.batch) {
     videoState.shorts = videoState.shorts || [];
     videoState.shorts.push({ blob, name, index: videoState.shorts.length + 1 });

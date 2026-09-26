@@ -241,21 +241,36 @@ export async function uploadPackToYoutube(media, copy) {
   const privacy = $("ytPrivacy")?.value || "unlisted";
   const jobs = [];
   const used = new Set();
-  const add = (kind, blob, short, index) => {
-    if (!blob || used.has(blob)) return;
+  const isWide = (item) => item && (item.aspect === "16:9" || (item.w && item.h && item.w > item.h));
+  const isTall = (item) => item && (item.aspect === "9:16" || item.short || (item.w && item.h && item.h > item.w));
+  const add = (kind, item, short, index) => {
+    const blob = item?.blob;
+    if (!blob || used.has(blob)) return false;
     used.add(blob);
-    jobs.push({ kind, blob, short: !!short, index });
+    jobs.push({ kind, blob, item, short: !!short, index });
+    return true;
   };
-  if ($("ytUpWide")?.checked) add("16:9 master", media.wide?.blob || null, false);
-  if ($("ytUpTall")?.checked) add("9:16 master", media.tall?.blob || null, true);
-  if ($("ytUpMain")?.checked) add("current render", media.main?.blob || null, false);
-  if (!jobs.length && media.main?.blob) add("current render", media.main.blob, false);
+  if ($("ytUpWide")?.checked) {
+    if (!add("16:9 master", media.wide, false) && isWide(media.main)) add("16:9 master", media.main, false);
+  }
+  if ($("ytUpTall")?.checked) {
+    if (!add("9:16 master", media.tall, true) && isTall(media.main) && !isWide(media.main)) add("9:16 master", media.main, true);
+  }
+  if ($("ytUpMain")?.checked) add("current render", media.main, isTall(media.main) && !isWide(media.main));
   if ($("ytUpShorts")?.checked) {
-    (media.shorts || []).forEach((s, i) => add(`Short ${s.index || i + 1}`, s?.blob, true, s.index || i + 1));
+    (media.shorts || []).forEach((s, i) => add(`Short ${s.index || i + 1}`, s, true, s.index || i + 1));
   }
   if (!jobs.length) {
-    throw new Error("Nothing in memory to upload. Render in background (or Build release pack), wait until Download video is on, then Post again.");
+    throw new Error("Nothing matching those checkboxes. 16:9 master needs a landscape render. Shorts need Render YouTube Short first. Or check Current render only.");
   }
+  const preview = jobs.map((j) => {
+    const shape = j.item?.aspect || (j.short ? "9:16" : "video");
+    const mb = (j.blob.size / 1e6).toFixed(1);
+    const warn = j.short && j.item?.duration > 180 ? " (over 3 min — YouTube may put this in Videos, not Shorts)" : "";
+    return `• ${j.kind} · ${shape} · ${mb} MB${warn}`;
+  }).join("\n");
+  const ok = window.confirm(`Upload ${jobs.length} file(s) as ${privacy}?\n\n${preview}\n\nYouTube puts a file in Shorts only if it is vertical and about 3 minutes or less. A 16:9 master should land in Videos.`);
+  if (!ok) throw new Error("Upload cancelled.");
 
   const title = clip(copy.title, 100);
   const desc = clip(`${copy.description || ""}\n\nChapters\n${copy.chapters || ""}\n\n${copy.hashtags || ""}`, 4900);
@@ -264,8 +279,8 @@ export async function uploadPackToYoutube(media, copy) {
 
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i];
-    const useTitle = job.short
-      ? clip(`${title}${job.index ? " · Short " + job.index : ""}`, 100)
+    const useTitle = String(job.kind).startsWith("Short")
+      ? clip(`${title} · Short ${job.index || ""}`.trim(), 100)
       : title;
     setStatus(`Uploading ${job.kind} to YouTube (${i + 1}/${jobs.length}) as ${privacy}…`);
     const video = await resumableUpload(
