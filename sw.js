@@ -1,4 +1,4 @@
-const CACHE = "wavesrt-v16";
+const CACHE = "wavesrt-v17";
 const ASSETS = [
   "./",
   "./index.html",
