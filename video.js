@@ -29,7 +29,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "25";
+export const APP_REV = "26";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1984,8 +1984,11 @@ export async function postReleaseToYoutube() {
     const lines = posted.map((p) => `${p.kind}: ${p.url || p.id}`).join(" · ");
     setStatus(`Posted ${posted.length} file(s) as ${$("ytPrivacy")?.value || "unlisted"}. ${lines}`, "ok");
     if ($("ytPostLog")) $("ytPostLog").textContent = posted.map((p) => `${p.kind}\n${p.url}`).join("\n\n");
+    window.alert(`Posted ${posted.length} file(s).\n\n${posted.map((p) => `${p.kind}\n${p.url}`).join("\n\n")}`);
   } catch (err) {
-    setStatus(String(err.message || err), "error");
+    const msg = String(err.message || err);
+    setStatus(msg, "error");
+    if (msg !== "Upload cancelled.") window.alert(msg);
   }
 }
 

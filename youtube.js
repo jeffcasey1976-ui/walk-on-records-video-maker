@@ -252,9 +252,10 @@ export async function uploadPackToYoutube(media, copy) {
     return true;
   };
   if ($("ytUpWide")?.checked) {
-    const item = isWide(media.wide) ? media.wide : isWide(media.main) ? media.main : null;
+    let item = isWide(media.wide) ? media.wide : isWide(media.main) ? media.main : null;
+    if (!item && media.main?.blob && $("aspect")?.value === "16:9" && !looksShort(media.main)) item = media.main;
     if (!add("16:9 landscape", item, false)) {
-      throw new Error("16:9 landscape is checked, but the file in memory is not landscape. Set Aspect to 16:9 and render again.");
+      throw new Error("16:9 is checked, but there is no landscape file in memory. Set Aspect to 16:9, Render, wait until Download video is on, then Post.");
     }
   }
   if ($("ytUpTall")?.checked) {
@@ -267,8 +268,11 @@ export async function uploadPackToYoutube(media, copy) {
   if ($("ytUpShorts")?.checked) {
     (media.shorts || []).forEach((s, i) => add(`Short ${s.index || i + 1}`, s, true, s.index || i + 1));
   }
+  if (!jobs.length && media.main?.blob) {
+    add("current render", media.main, false);
+  }
   if (!jobs.length) {
-    throw new Error("Nothing matching those checkboxes. 16:9 master needs a landscape render. Shorts need Render YouTube Short first. Or check Current render only.");
+    throw new Error("Nothing to upload. Render a video first (Download video should turn on), then check one box or Post again to send the current render.");
   }
   const preview = jobs.map((j) => {
     const shape = j.item?.aspect || (j.short ? "9:16" : "video");
