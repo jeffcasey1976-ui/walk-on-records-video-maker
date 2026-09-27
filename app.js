@@ -376,9 +376,15 @@ function applyCapcutTimes() {
   );
 }
 
+function isBracketTag(line) {
+  const raw = String(line || "").trim();
+  return /^\[.*\]$/.test(raw) || /^【.*】$/.test(raw) || /^\{.*\}$/.test(raw);
+}
+
 function isHeader(line) {
   const raw = String(line || "").trim();
   if (!raw) return false;
+  if (isBracketTag(raw)) return true;
   const stripped = raw
     .replace(/^[\s\[\(\{<]+/, "")
     .replace(/[\s\]\)\}>:.\-–—]+$/, "")
@@ -395,6 +401,7 @@ function parseLyrics(raw) {
   for (const rawLine of raw.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line) continue;
+    if (isBracketTag(line)) continue;
     if (isHeader(line) && !keepHeaders) continue;
     if (splitLong && line.length > 84 && /\s/.test(line)) {
       const words = line.split(/\s+/);
@@ -806,9 +813,17 @@ async function aiAlign() {
   if (!state.audioBuffer) return setStatus("Load audio first.", "error");
   rebuildCuesKeepTimes();
   if (!state.cues.length) return setStatus("Add lyrics first.", "error");
+  const model = $("whisperModel")?.value || "Xenova/whisper-base.en";
+  if (/whisper-small/.test(model)) {
+    const ok = window.confirm(
+      "Best / small will freeze this tab for several minutes while Chrome downloads and runs a large model.\n\nClick Wait if Chrome says the page is unresponsive.\n\nCancel and pick Better · base unless you have a strong PC."
+    );
+    if (!ok) return;
+  }
   $("aiBtn").disabled = true;
   setProgress(0.05);
-  setStatus("Loading Whisper in the browser (first time can take a minute)…");
+  setStatus("Loading Whisper… click Wait if Chrome says the page is unresponsive.");
+  await new Promise((r) => setTimeout(r, 40));
   try {
     const { pipeline } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1");
     const lang = $("lang").value;

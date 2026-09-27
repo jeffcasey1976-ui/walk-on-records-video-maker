@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 33 · 2026-09-27</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 34 · 2026-09-27</span></h1>
         <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -95,7 +95,7 @@
         <label for="lyrics">One line per subtitle</label>
         <textarea id="lyrics" placeholder="I been driving all night&#10;Just to see your face&#10;&#10;[Chorus]&#10;Don't you disappear"></textarea>
         <div class="checks">
-          <label><input type="checkbox" id="keepHeaders" /> Keep section labels in the SRT</label>
+          <label><input type="checkbox" id="keepHeaders" /> Keep unbracketed section labels in the SRT</label>
           <label><input type="checkbox" id="splitLong" checked /> Split very long lines</label>
         </div>
       </div>
@@ -108,7 +108,7 @@
           <select id="whisperModel">
             <option value="Xenova/whisper-tiny.en">Fast · tiny (weak on singing)</option>
             <option value="Xenova/whisper-base.en" selected>Better · base (recommended)</option>
-            <option value="Xenova/whisper-small.en">Best in browser · small (slower, ~500MB first time)</option>
+            <option value="Xenova/whisper-small.en">Best · small (freezes tab, click Wait)</option>
           </select>
         </label>
         <label style="margin:0">Language hint

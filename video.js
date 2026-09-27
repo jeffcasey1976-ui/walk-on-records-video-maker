@@ -30,7 +30,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "33";
+export const APP_REV = "34";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
