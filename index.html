@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 28 · 2026-09-27</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 29 · 2026-09-27</span></h1>
         <p>Best path: CapCut SRT for times + your lyrics for words. Then turn the timed lines into a 9:16 or 16:9 lyric video.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -276,6 +276,7 @@
             <button type="button" class="ghost" data-grok-preset="day">Day highway</button>
             <button type="button" class="ghost" data-grok-preset="stage">Stage</button>
             <button type="button" class="ghost" data-grok-preset="bw">Black &amp; white</button>
+            <button type="button" class="ghost" data-grok-preset="miles">Miles JC Million</button>
           </div>
           <label for="grokRefNote">Look lock from a kept still</label>
           <input id="grokRefNote" type="text" style="width:100%;max-width:none" placeholder="Use look on a preview to fill this" />
@@ -283,7 +284,7 @@
           <textarea id="grokPrompt" class="release-copy" placeholder="One scene, or a numbered list. Fill shot list uses the song."></textarea>
           <div class="row video-opts">
             <label>How many
-              <input id="grokCount" type="number" min="1" max="6" step="1" value="4" />
+              <input id="grokCount" type="number" min="1" max="10" step="1" value="10" />
             </label>
             <label>Model
               <select id="grokModel">
@@ -294,6 +295,10 @@
             <label>Replace slot
               <select id="grokSlot"><option value="">New photos</option></select>
             </label>
+          </div>
+          <div class="btn-row">
+            <label class="inline-check"><input id="grokUseLyrics" type="checkbox" checked /> Use lyrics for shots</label>
+            <label class="inline-check"><input id="grokNoPeople" type="checkbox" checked /> No people</label>
           </div>
           <div class="btn-row">
             <button id="grokShots" class="secondary" type="button">Fill shot list from song</button>

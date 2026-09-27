@@ -11,6 +11,7 @@ const PRESETS = {
   day: "Walk On Records day. Hot west Texas sun, chrome and asphalt, hard shadows, photoreal, no haze filter.",
   stage: "Walk On Records stage. Dark room, one spotlight, light smoke, concert still, photoreal.",
   bw: "Walk On Records black and white documentary still, high contrast grain, photoreal, no color.",
+  miles: "Miles JC Million lock. Burgundy 1980 Kenworth W900A conventional, square chrome grill, matching white dry van, empty cab, photoreal country night, same hero truck every frame.",
 };
 
 let drafts = [];
@@ -58,47 +59,92 @@ async function urlToFile(url, name) {
 function fullPrompt(scene, extra) {
   const style = ($("grokStyle")?.value || "").trim();
   const ref = ($("grokRefNote")?.value || "").trim();
-  return [scene, extra, style, ref ? `match this look: ${ref}` : "", NO_TEXT].filter(Boolean).join(". ");
+  const nobody = $("grokNoPeople")?.checked === false
+    ? ""
+    : "no people, no faces, no silhouettes, no hands, empty cab if a truck";
+  return [scene, extra, style, ref ? `match this look: ${ref}` : "", nobody, NO_TEXT].filter(Boolean).join(". ");
+}
+
+function lyricSections() {
+  const raw = String($("lyrics")?.value || "");
+  const lines = raw.split(/\n/);
+  const sections = [];
+  let cur = { label: "Song", lines: [] };
+  const header = /^(verse\s*\d*|chorus|bridge|outro|intro|hook|pre-?chorus)(\s*\([^)]+\))?$/i;
+  lines.forEach((line) => {
+    const t = line.trim();
+    if (!t) return;
+    const bare = t.replace(/^[\[("']+|[\])"']+$/g, "").trim();
+    if (header.test(bare)) {
+      if (cur.lines.length) sections.push(cur);
+      cur = { label: bare.replace(/\s+/g, " "), lines: [] };
+      return;
+    }
+    if (/^[\[(]/.test(t) && header.test(bare)) return;
+    cur.lines.push(t);
+  });
+  if (cur.lines.length) sections.push(cur);
+  return sections;
 }
 
 function lyricBeats(n) {
   const title = ($("songTitle")?.value || "").trim();
   const artist = ($("songArtist")?.value || "").trim();
-  const lines = String($("lyrics")?.value || "")
-    .split(/\n/)
-    .map((l) => l.trim())
-    .filter((l) => l && !/^(verse|chorus|bridge|outro|intro)\b/i.test(l) && !/^[\[(]/.test(l));
-  const stock = [
-    title ? `${title} world, wide empty highway at golden hour` : "empty two-lane highway at golden hour",
-    "cab interior at night, dashboard glow, one trucker silhouette",
-    "semi on a west Texas grade, sun behind the trailer",
-    "truck stop neon in the rain, wet asphalt",
-    "wide sky, fence line, distant headlights",
-    "end-card sky, last light, no people close to camera",
-  ];
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const lyric = lines[Math.floor((i * Math.max(1, lines.length)) / n)] || "";
-    const base = stock[i % stock.length];
-    out.push(lyric ? `${base}. mood of the line: ${lyric.slice(0, 80)}` : base);
-    if (artist && i === 0) out[0] += `. artist world of ${artist}`;
+  const sections = lyricSections();
+  const want = Math.max(1, Math.min(10, n || 4));
+  const shots = [];
+  if (title) {
+    shots.push(`${title}${artist ? " — " + artist : ""} cover still. Night two-lane, headlights on wet blacktop, empty road.`);
   }
-  return out;
+  sections.forEach((sec) => {
+    const words = sec.lines.join(" / ");
+    shots.push(`${sec.label}: ${words.slice(0, 140)}. Photoreal scene that shows those lyrics, not the words on the image.`);
+  });
+  if (shots.length === 1 && sections[0]) {
+    const extras = sections[0].lines.filter((l) => l.length > 8);
+    extras.forEach((line) => {
+      shots.push(`${line}. Photoreal scene for that line, no words painted on the picture.`);
+    });
+  }
+  if (!shots.length) {
+    shots.push(title ? `${title} world, empty highway` : "empty two-lane highway at night");
+  }
+  if (shots.length === want) return shots;
+  if (shots.length > want) {
+    const out = [];
+    for (let i = 0; i < want; i++) out.push(shots[Math.round((i * (shots.length - 1)) / Math.max(1, want - 1))]);
+    return out;
+  }
+  const pad = shots[shots.length - 1];
+  while (shots.length < want) shots.push(pad);
+  return shots;
 }
 
 export function fillShotList() {
-  const n = Math.max(1, Math.min(6, Number($("grokCount")?.value) || 4));
+  const n = Math.max(1, Math.min(10, Number($("grokCount")?.value) || 4));
   const beats = lyricBeats(n);
   if ($("grokPrompt")) $("grokPrompt").value = beats.map((b, i) => `${i + 1}. ${b}`).join("\n");
-  setStatus(`Wrote ${n} shot prompts from the title and lyrics. Edit, then Generate.`, "ok");
+  setStatus(`Wrote ${beats.length} lyric shots from the song. Edit if you want, then Generate.`, "ok");
 }
 
 function parseScenes(n) {
+  const want = Math.max(1, Math.min(10, n || 4));
   const raw = ($("grokPrompt")?.value || "").trim();
-  if (!raw) return [];
+  const useLyrics = $("grokUseLyrics") ? $("grokUseLyrics").checked : true;
+  const hasLyrics = !!String($("lyrics")?.value || "").trim();
+  if (useLyrics && hasLyrics) {
+    const fromSong = lyricBeats(want);
+    if (!raw) return fromSong;
+    const numbered = raw.split(/\n+/).map((l) => l.replace(/^\d+[.)]\s*/, "").trim()).filter(Boolean);
+    if (numbered.length >= 2) {
+      return numbered.slice(0, want).map((scene, i) => `${scene}. Lyric beat: ${fromSong[Math.min(i, fromSong.length - 1)]}`);
+    }
+    return fromSong.map((beat) => `${raw}. ${beat}`);
+  }
+  if (!raw) return lyricBeats(want);
   const numbered = raw.split(/\n+/).map((l) => l.replace(/^\d+[.)]\s*/, "").trim()).filter(Boolean);
-  if (numbered.length >= 2) return numbered.slice(0, n);
-  return Array.from({ length: n }, () => raw);
+  if (numbered.length >= 2) return numbered.slice(0, want);
+  return Array.from({ length: want }, () => raw);
 }
 
 async function callImagine(prompt, n) {
@@ -189,7 +235,7 @@ function paintSlotSelect() {
 }
 
 async function runGenerate() {
-  const n = Math.max(1, Math.min(6, Number($("grokCount")?.value) || 3));
+  const n = Math.max(1, Math.min(10, Number($("grokCount")?.value) || 4));
   const scenes = parseScenes(n);
   if (!scenes.length) {
     setStatus("Write a prompt, or Fill shot list from the song.", "error");
