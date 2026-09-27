@@ -1,7 +1,28 @@
 import { state, $, setStatus, setProgress } from "./app.js";
 import { idbGet, idbSet, idbDel, WM_KEY, LOOK_KEY, listLogos, getLogo, putLogo, deleteLogo, newProjectId } from "./projects.js";
-import { initYoutube, uploadPackToYoutube, describeYtQueue } from "./youtube.js";
-import { initGrokImagine } from "./grok-imagine.js";
+let uploadPackToYoutube = async () => {
+  throw new Error("youtube.js did not load. Upload that file and Force refresh.");
+};
+let describeYtQueue = () => "";
+let initYoutube = () => {};
+let initGrokImagine = () => {};
+
+async function loadExtraModules() {
+  try {
+    const yt = await import("./youtube.js");
+    if (typeof yt.initYoutube === "function") initYoutube = yt.initYoutube;
+    if (typeof yt.uploadPackToYoutube === "function") uploadPackToYoutube = yt.uploadPackToYoutube;
+    if (typeof yt.describeYtQueue === "function") describeYtQueue = yt.describeYtQueue;
+  } catch (err) {
+    console.error("youtube.js failed", err);
+  }
+  try {
+    const grok = await import("./grok-imagine.js");
+    if (typeof grok.initGrokImagine === "function") initGrokImagine = grok.initGrokImagine;
+  } catch (err) {
+    console.error("grok-imagine.js failed", err);
+  }
+}
 
 const videoState = {
   photos: [],
@@ -30,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "37";
+export const APP_REV = "38";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -2936,15 +2957,24 @@ export function initVideoMaker() {
   if ($("saveLook")) $("saveLook").addEventListener("click", () => saveBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("loadLook")) $("loadLook").addEventListener("click", () => loadBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("lyrics")) $("lyrics").addEventListener("input", paintSongCheck);
-  initGrokImagine({
-    addPhotos,
-    replacePhotoAt,
-    photoNames,
-    evenOut: evenOutPhotoTimes,
-    writeSongPhotos,
-  });
-  initYoutube();
-  const paintYtQueue = () => describeYtQueue(releaseMedia());
+  const paintYtQueue = () => {
+    try {
+      describeYtQueue(releaseMedia());
+    } catch (_) {}
+  };
+  loadExtraModules()
+    .then(() => {
+      initGrokImagine({
+        addPhotos,
+        replacePhotoAt,
+        photoNames,
+        evenOut: evenOutPhotoTimes,
+        writeSongPhotos,
+      });
+      initYoutube();
+      paintYtQueue();
+    })
+    .catch((err) => console.error(err));
   ["ytUpWide", "ytUpTall", "ytUpShorts", "ytUpMain"].forEach((id) => {
     if ($(id)) $(id).addEventListener("change", paintYtQueue);
   });
