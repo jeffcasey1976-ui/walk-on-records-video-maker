@@ -361,19 +361,61 @@ function applyCapcutTimes() {
   state.lines = parseLyrics(lyricsEl.value);
   if (!state.lines.length) return setStatus("Add the correct lyrics first.", "error");
   if (!state.capcut.length) return setStatus("Drop an SRT first.", "error");
-  let mapped = alignLyricsToCapcutWords(state.lines, state.capcut);
-  if (!mapped || !mapped.length) mapped = reflowLyricsOntoSrt(state.lines, state.capcut);
-  mapped = snapToCapcutOnsets(mapped, state.capcut);
+  const mapped = spreadLyricsAcrossSrt(state.lines, state.capcut);
+  if (!mapped.length) return setStatus("Could not map lyrics onto that SRT.", "error");
   state.cues = mapped.map((c) => ({ text: c.text, start: c.start, end: c.end }));
   snapCues();
   state.active = 0;
   renderCues();
   renderCurrent();
-  const method = mapped[0]?.from || "capcut";
+  const first = fmtClock(state.cues[0].start);
+  const last = fmtClock(state.cues[state.cues.length - 1].end);
   setStatus(
-    `Used ${state.capcut.length} SRT cues → ${state.cues.length} lyric lines (${method}). Words are yours; clocks are from the SRT.`,
+    `SRT clocks only: ${state.capcut.length} windows → ${state.cues.length} lyric lines (${first}–${last}). Words are yours.`,
     "ok"
   );
+}
+
+function spreadLyricsAcrossSrt(lines, srtCues) {
+  const lyrics = (lines || []).map((l) => String(l).trim()).filter(Boolean);
+  if (!lyrics.length || !srtCues.length) return [];
+  const spans = srtCues
+    .map((c) => [Number(c.start), Number(c.end)])
+    .filter(([a, b]) => b > a + 0.05);
+  const total = spans.reduce((s, [a, b]) => s + (b - a), 0);
+  if (total < 0.5) return [];
+  const weights = lyrics.map((text) => Math.max(10, text.replace(/\s+/g, "").length));
+  const sumW = weights.reduce((a, b) => a + b, 0) || 1;
+  const minEach = Math.min(1.6, Math.max(0.7, total / lyrics.length * 0.45));
+  const raw = weights.map((w) => Math.max(minEach, (w / sumW) * total));
+  const rawSum = raw.reduce((a, b) => a + b, 0) || 1;
+  const needs = raw.map((n) => (n / rawSum) * total);
+  const out = [];
+  let si = 0;
+  let used = 0;
+  const pos = () => {
+    const [a] = spans[Math.min(si, spans.length - 1)];
+    return a + used;
+  };
+  lyrics.forEach((text, i) => {
+    let need = needs[i];
+    const start = pos();
+    while (need > 0.001 && si < spans.length) {
+      const [a, b] = spans[si];
+      const avail = Math.max(0, b - a - used);
+      const take = Math.min(avail, need);
+      used += take;
+      need -= take;
+      if (used >= b - a - 0.001) {
+        si += 1;
+        used = 0;
+      }
+    }
+    let end = Math.max(start + 0.55, pos());
+    if (i === lyrics.length - 1) end = Math.max(end, spans[spans.length - 1][1]);
+    out.push({ text, start, end, from: "srt-spread" });
+  });
+  return out;
 }
 
 function isBracketTag(line) {
