@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 26 · 2026-09-26</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 28 · 2026-09-27</span></h1>
         <p>Best path: CapCut SRT for times + your lyrics for words. Then turn the timed lines into a 9:16 or 16:9 lyric video.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -261,6 +261,47 @@
             <button id="evenPhotos" class="secondary" type="button">Even out times</button>
             <button id="clearPhotos" class="ghost" type="button">Clear photos</button>
           </div>
+          <h3 class="subhead">Grok Imagine</h3>
+          <p class="hint" style="margin-top:0">Key stays in this browser. Style lock keeps a whole set looking like one shoot. Preview first, then Keep. No-text is added for you. Key: <a href="https://console.x.ai/" target="_blank" rel="noopener">console.x.ai</a></p>
+          <label>xAI API key
+            <input id="grokKey" type="password" style="width:100%;max-width:none" placeholder="xai-..." autocomplete="off" />
+          </label>
+          <div class="btn-row">
+            <button id="grokSaveKey" class="secondary" type="button">Save key + style</button>
+          </div>
+          <label for="grokStyle">Style lock (every still)</label>
+          <textarea id="grokStyle" class="release-copy short-copy" placeholder="Cinematic country, Kodak grain, photoreal, same truck"></textarea>
+          <div class="btn-row">
+            <button type="button" class="ghost" data-grok-preset="night">Night</button>
+            <button type="button" class="ghost" data-grok-preset="day">Day highway</button>
+            <button type="button" class="ghost" data-grok-preset="stage">Stage</button>
+            <button type="button" class="ghost" data-grok-preset="bw">Black &amp; white</button>
+          </div>
+          <label for="grokRefNote">Look lock from a kept still</label>
+          <input id="grokRefNote" type="text" style="width:100%;max-width:none" placeholder="Use look on a preview to fill this" />
+          <label for="grokPrompt">Shot list / prompt</label>
+          <textarea id="grokPrompt" class="release-copy" placeholder="One scene, or a numbered list. Fill shot list uses the song."></textarea>
+          <div class="row video-opts">
+            <label>How many
+              <input id="grokCount" type="number" min="1" max="6" step="1" value="4" />
+            </label>
+            <label>Model
+              <select id="grokModel">
+                <option value="grok-imagine-image">grok-imagine-image</option>
+                <option value="grok-imagine-image-2.0">grok-imagine-image-2.0</option>
+              </select>
+            </label>
+            <label>Replace slot
+              <select id="grokSlot"><option value="">New photos</option></select>
+            </label>
+          </div>
+          <div class="btn-row">
+            <button id="grokShots" class="secondary" type="button">Fill shot list from song</button>
+            <button id="grokGenerate" type="button">Generate previews</button>
+            <button id="grokKeep" class="accent" type="button">Keep selected</button>
+            <button id="grokClearDrafts" class="ghost" type="button">Clear previews</button>
+          </div>
+          <div id="grokDrafts" class="grok-drafts"></div>
         </div>
         <div>
           <div id="loopDrop" class="drop">

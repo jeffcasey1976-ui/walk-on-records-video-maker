@@ -1,4 +1,4 @@
-const CACHE = "wavesrt-v20";
+const CACHE = "wavesrt-v22";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const ASSETS = [
   "./video.js",
   "./projects.js",
   "./youtube.js",
+  "./grok-imagine.js",
   "./manifest.json",
   "./icon.svg"
 ];

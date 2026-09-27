@@ -1,6 +1,7 @@
 import { state, $, setStatus, setProgress } from "./app.js";
 import { idbGet, idbSet, idbDel, WM_KEY, LOOK_KEY, listLogos, getLogo, putLogo, deleteLogo, newProjectId } from "./projects.js";
 import { initYoutube, uploadPackToYoutube, describeYtQueue } from "./youtube.js";
+import { initGrokImagine } from "./grok-imagine.js";
 
 const videoState = {
   photos: [],
@@ -29,7 +30,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "26";
+export const APP_REV = "28";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -2280,7 +2281,7 @@ function clearLoopVideo() {
   if ($("loopFile")) $("loopFile").value = "";
 }
 
-async function addPhotos(fileList) {
+export async function addPhotos(fileList) {
   const incoming = [...(fileList || [])];
   let files = incoming.filter(looksLikeImage);
   if (!files.length) files = incoming.filter((f) => f && f.size);
@@ -2314,6 +2315,25 @@ async function addPhotos(fileList) {
       "ok"
     );
   }
+}
+
+export function photoNames() {
+  return videoState.photos.map((p) => p.name || "photo");
+}
+
+export async function replacePhotoAt(index, file) {
+  if (!file || index < 0 || index >= videoState.photos.length) {
+    throw new Error("Pick a photo slot to replace.");
+  }
+  const item = await loadImageFromFile(file);
+  item.hold = videoState.photos[index].hold || defaultPhotoHold();
+  const old = videoState.photos[index];
+  if (old?.url) URL.revokeObjectURL(old.url);
+  videoState.photos[index] = item;
+  renderPhotoList();
+  if ($("photoName")) $("photoName").textContent = `${videoState.photos.length} photos`;
+  videoReady();
+  paintPreview($("player")?.currentTime || 0);
 }
 
 async function setLoopVideo(file) {
@@ -2828,6 +2848,12 @@ export function initVideoMaker() {
   }
   if ($("saveLook")) $("saveLook").addEventListener("click", () => saveBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("loadLook")) $("loadLook").addEventListener("click", () => loadBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
+  initGrokImagine({
+    addPhotos,
+    replacePhotoAt,
+    photoNames,
+    evenOut: evenOutPhotoTimes,
+  });
   initYoutube();
   const paintYtQueue = () => describeYtQueue(releaseMedia());
   ["ytUpWide", "ytUpTall", "ytUpShorts", "ytUpMain"].forEach((id) => {
