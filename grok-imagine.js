@@ -3,6 +3,7 @@ import { idbGet, idbSet } from "./projects.js";
 
 export const GROK_KEY = "xai-api-key";
 export const GROK_STYLE_KEY = "xai-style-lock";
+export const GROK_LOOKS_KEY = "xai-look-library";
 
 const NO_TEXT = "no text, no captions, no letters, no numbers on signs, no watermark, no logo, no UI overlay";
 
@@ -200,6 +201,7 @@ function paintDrafts() {
       const src = d.url || "";
       return `<div class="grok-draft${d.keep ? " keep" : ""}" data-i="${i}">
         <img src="${src}" alt="${d.file.name}" />
+        <div class="grok-draft-cap">${(d.scene || "").slice(0, 90)}</div>
         <div class="grok-draft-bar">
           <label><input type="checkbox" data-keep="${i}" ${d.keep ? "checked" : ""}/> Keep</label>
           <button type="button" class="ghost" data-ref="${i}">Use look</button>
@@ -265,8 +267,53 @@ async function keepSelected() {
   } else {
     await hooks.addPhotos(chosen.map((d) => d.file));
     if ($("photoEven")?.checked) hooks.evenOut();
+    if (hooks.writeSongPhotos) await hooks.writeSongPhotos(chosen.map((d) => d.file));
   }
   paintSlotSelect();
+}
+
+async function fileToB64(file) {
+  const buf = await file.arrayBuffer();
+  let bin = "";
+  const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+async function loadLooks() {
+  const rows = await idbGet(GROK_LOOKS_KEY);
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function paintLooks() {
+  const sel = $("grokLookLib");
+  if (!sel) return;
+  const rows = await loadLooks();
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">Look library…</option>` + rows.map((r) => `<option value="${r.id}">${r.name}</option>`).join("");
+  if (rows.some((r) => r.id === cur)) sel.value = cur;
+}
+
+async function saveLookFromDraft() {
+  const kept = drafts.find((d) => d.keep) || drafts[0];
+  if (!kept?.file) return setStatus("Generate a preview first, then save it as a look.", "error");
+  const name = window.prompt("Name this look", "Miles W900A");
+  if (!name) return;
+  const rows = await loadLooks();
+  rows.push({ id: `look-${Date.now()}`, name: name.trim(), b64: await fileToB64(kept.file), type: kept.file.type || "image/jpeg" });
+  await idbSet(GROK_LOOKS_KEY, rows);
+  await paintLooks();
+  setStatus(`Saved look “${name.trim()}”. Pick it for any artist.`, "ok");
+}
+
+async function useSavedLook() {
+  const id = $("grokLookLib")?.value;
+  if (!id) return setStatus("Pick a saved look first.", "error");
+  const rows = await loadLooks();
+  const hit = rows.find((r) => r.id === id);
+  if (!hit) return setStatus("That look is gone.", "error");
+  if ($("grokRefNote")) $("grokRefNote").value = `same hero vehicle, same lighting, same color grade as look “${hit.name}”`;
+  setStatus(`Using look “${hit.name}” on the next generate.`, "ok");
 }
 
 export function initGrokImagine(api) {
@@ -294,4 +341,7 @@ export function initGrokImagine(api) {
       setStatus("Style lock set. All new stills use this look.", "ok");
     });
   });
+  paintLooks().catch(() => {});
+  if ($("grokLookSave")) $("grokLookSave").addEventListener("click", () => saveLookFromDraft());
+  if ($("grokLookUse")) $("grokLookUse").addEventListener("click", () => useSavedLook());
 }

@@ -102,7 +102,7 @@ Repeats must be written out if they are sung more than once.
 
 ## Lyric video (section 6)
 
-After timings exist (CapCut / Guess / AI / tap):
+After timings exist (SRT / Guess / AI / tap):
 
 1. Choose **9:16** (Shorts, Reels, TikTok) or **16:9** (YouTube).
 2. Drop several photos *or* one video that should loop. Photo duration and crossfade are separate fields. **Photo motion** adds a Ken Burns auto pan/zoom (alternating directions, ease-in/out). Use Subtle if a photo looks soft when pushed in.
@@ -114,7 +114,7 @@ After timings exist (CapCut / Guess / AI / tap):
 
 The top bar is a local project folder in this browser (nothing is uploaded).
 
-- **Save** stores audio, lyrics, CapCut SRT, cues, photos or loop clip, logo, layout, and the rendered video if one is ready.
+- **Save** stores audio, lyrics, SRT, cues, photos or loop clip, logo, layout, and the rendered video if one is ready.
 - **Save as** / **Duplicate** copy everything under a new name. The original project is left untouched.
 - **Open** lists saved projects. The last one reopens the next time you load the app.
 

@@ -30,7 +30,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "29";
+export const APP_REV = "33";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1063,6 +1063,13 @@ function paintShortDownloads() {
     });
     box.appendChild(btn);
   });
+  const picks = $("ytShortPicks");
+  if (picks) {
+    picks.innerHTML = rows
+      .map((row) => `<label class="inline-check"><input type="checkbox" id="ytShort${row.index}" checked /> Short ${row.index}</label>`)
+      .join("") || `<span class="hint">No Shorts rendered yet.</span>`;
+  }
+  paintSongCheck();
 }
 
 function updateShortHint() {
@@ -1338,7 +1345,54 @@ function updateDownloadButtons() {
   });
 }
 
+export function paintSongCheck() {
+  const el = $("songCheck");
+  if (!el) return;
+  const hasAudio = !!(state.audioBuffer || state.duration);
+  const hasLyrics = !!String($("lyrics")?.value || "").trim();
+  const hasSrt = !!(state.capcut && state.capcut.length);
+  const hasStills = videoState.photos.length > 0;
+  const hasWide = !!(videoState.masters.wide?.blob || (videoState.main?.blob && videoState.main.aspect === "16:9"));
+  const hasTall = !!(videoState.masters.tall?.blob || (videoState.main?.blob && videoState.main.aspect === "9:16"));
+  const hasShorts = (videoState.shorts || []).length > 0;
+  const hasPack = !!(videoState.releaseRoot || (hasWide && hasTall));
+  const hasYt = !!String($("ytPostLog")?.textContent || "").includes("youtu");
+  const map = { audio: hasAudio, lyrics: hasLyrics, srt: hasSrt, stills: hasStills, wide: hasWide, tall: hasTall, shorts: hasShorts, pack: hasPack, yt: hasYt };
+  el.querySelectorAll("[data-chk]").forEach((span) => {
+    span.classList.toggle("done", !!map[span.dataset.chk]);
+  });
+}
+
+export function loudnessNote() {
+  const buf = state.audioBuffer;
+  const el = $("loudnessNote");
+  if (!buf) {
+    if (el) el.textContent = "";
+    return "";
+  }
+  const ch = buf.getChannelData(0);
+  let peak = 0;
+  let sum = 0;
+  const step = Math.max(1, Math.floor(ch.length / 20000));
+  let n = 0;
+  for (let i = 0; i < ch.length; i += step) {
+    const a = Math.abs(ch[i]);
+    if (a > peak) peak = a;
+    sum += a * a;
+    n += 1;
+  }
+  const peakDb = 20 * Math.log10(peak || 1e-6);
+  const rmsDb = 20 * Math.log10(Math.sqrt(sum / Math.max(1, n)) || 1e-6);
+  let msg = `Peak ${peakDb.toFixed(1)} dBFS · RMS ${rmsDb.toFixed(1)} dBFS`;
+  if (peakDb > -0.3) msg += " — hot, may clip on YouTube";
+  else if (peakDb < -12) msg += " — quiet, consider raising the master";
+  if (el) el.textContent = msg;
+  return msg;
+}
+
 export function videoReady() {
+  paintSongCheck();
+  loudnessNote();
   const hasAudio = !!(state.audioBuffer || (state.duration && $("player").src));
   const ok = hasAudio && hasBackground();
   const btn = $("renderVideo");
@@ -1534,16 +1588,32 @@ function defaultReleaseParts() {
   const album = introMeta().album;
   const cues = timedCues();
   const chapters = [];
-  let lastMin = -1;
-  cues.forEach((c) => {
-    const m = Math.floor(c.start / 60);
-    if (m !== lastMin) {
-      lastMin = m;
-      const mm = String(m).padStart(2, "0");
-      const ss = String(Math.floor(c.start % 60)).padStart(2, "0");
-      chapters.push(`${mm}:${ss} ${c.text.slice(0, 42)}`);
-    }
-  });
+  const header = /^(verse\s*\d*|chorus|bridge|outro|intro|hook|pre-?chorus)(\s*\([^)]+\))?$/i;
+  let cueI = 0;
+  String($("lyrics")?.value || "")
+    .split(/\n/)
+    .forEach((raw) => {
+      const t = raw.trim().replace(/^[\[("']+|[\])"']+$/g, "").trim();
+      if (!t || !header.test(t)) return;
+      if (!cues.length) return;
+      const cue = cues[Math.min(cueI, cues.length - 1)];
+      const mm = String(Math.floor(cue.start / 60)).padStart(2, "0");
+      const ss = String(Math.floor(cue.start % 60)).padStart(2, "0");
+      chapters.push(`${mm}:${ss} ${t}`);
+      cueI = Math.min(cues.length - 1, cueI + Math.max(1, Math.floor(cues.length / 8)));
+    });
+  if (!chapters.length) {
+    let lastMin = -1;
+    cues.forEach((c) => {
+      const m = Math.floor(c.start / 60);
+      if (m !== lastMin) {
+        lastMin = m;
+        const mm = String(m).padStart(2, "0");
+        const ss = String(Math.floor(c.start % 60)).padStart(2, "0");
+        chapters.push(`${mm}:${ss} ${c.text.slice(0, 42)}`);
+      }
+    });
+  }
   const tags = [
     "#WalkOnRecords",
     "#LyricVideo",
@@ -1738,6 +1808,16 @@ async function pickReleaseRoot() {
   }
 }
 
+export async function writeSongPhotos(files) {
+  if (!videoState.releaseRoot || !files?.length) return;
+  const folder = slugName();
+  const entries = files.map((f, i) => ({
+    path: `${folder}/photos/${f.name || `photo-${i + 1}.jpg`}`,
+    blob: f,
+  }));
+  await writeReleaseEntries(entries);
+}
+
 async function writeDirFile(root, parts, data) {
   let dir = root;
   for (let i = 0; i < parts.length - 1; i++) {
@@ -1799,33 +1879,36 @@ async function buildReleaseDesk() {
     ...thumbs.map((th) => ({ path: `${folder}/thumbnails/${th.name}`, blob: th.blob })),
   ];
   if (videoState.releaseRoot) await writeReleaseEntries(textEntries);
-  setStatus("YouTube text and 3 thumbnails ready. Rendering 16:9, then 9:16, then Shorts…", "ok");
+  const reuse = $("skipRerender") ? $("skipRerender").checked : true;
+  setStatus(reuse ? "Using existing masters when present, then rendering what’s missing…" : "Rendering 16:9, then 9:16, then Shorts…", "ok");
   const aspectEl = $("aspect");
   const prev = aspectEl.value;
   const videos = [];
-  aspectEl.value = "16:9";
-  sizePreviewCanvas();
-  const wide = await renderVideo({ batch: true });
-  if (wide?.blob) {
-    videoState.masters.wide = wide;
-    videos.push({ path: `${folder}/video/master-16x9.${extForMime(wide.mime || wide.blob.type)}`, blob: wide.blob });
+  let wide = reuse && videoState.masters.wide?.blob ? videoState.masters.wide : null;
+  if (!wide) {
+    aspectEl.value = "16:9";
+    sizePreviewCanvas();
+    wide = await renderVideo({ batch: true });
+    if (wide?.blob) videoState.masters.wide = wide;
   }
+  if (wide?.blob) videos.push({ path: `${folder}/video/master-16x9.${extForMime(wide.mime || wide.blob.type)}`, blob: wide.blob });
   if (videoState.cancel) {
     aspectEl.value = prev;
     sizePreviewCanvas();
     return;
   }
-  aspectEl.value = "9:16";
-  sizePreviewCanvas();
-  const tall = await renderVideo({ batch: true });
-  if (tall?.blob) {
-    videoState.masters.tall = tall;
-    videos.push({ path: `${folder}/video/master-9x16.${extForMime(tall.mime || tall.blob.type)}`, blob: tall.blob });
+  let tall = reuse && videoState.masters.tall?.blob ? videoState.masters.tall : null;
+  if (!tall) {
+    aspectEl.value = "9:16";
+    sizePreviewCanvas();
+    tall = await renderVideo({ batch: true });
+    if (tall?.blob) videoState.masters.tall = tall;
   }
+  if (tall?.blob) videos.push({ path: `${folder}/video/master-9x16.${extForMime(tall.mime || tall.blob.type)}`, blob: tall.blob });
   aspectEl.value = prev;
   sizePreviewCanvas();
   const dur = mediaDuration();
-  if (dur > 120 && !videoState.cancel) await renderAutoShorts();
+  if (dur > 120 && !videoState.cancel && !((videoState.shorts || []).length >= 3 && reuse)) await renderAutoShorts();
   (videoState.shorts || []).forEach((s, i) => {
     if (s?.blob) videos.push({ path: `${folder}/video/short-${s.index || i + 1}-9x16.${extForMime(s.blob.type)}`, blob: s.blob });
   });
@@ -2823,7 +2906,7 @@ async function renderVideo(opts = {}) {
   setStatus(
     ext === "mp4"
       ? `Video ready (${(blob.size / 1e6).toFixed(1)} MB MP4). Use Download video — it is also stored in the project when you Save.`
-      : `Video ready (${(blob.size / 1e6).toFixed(1)} MB WebM). Use Download video. CapCut / YouTube / VLC open WebM.`,
+      : `Video ready (${(blob.size / 1e6).toFixed(1)} MB WebM). Use Download video. YouTube / VLC open WebM.`,
     "ok"
   );
   setTimeout(() => setProgress(null), 1200);
@@ -2848,11 +2931,13 @@ export function initVideoMaker() {
   }
   if ($("saveLook")) $("saveLook").addEventListener("click", () => saveBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
   if ($("loadLook")) $("loadLook").addEventListener("click", () => loadBrandKit().catch((e) => setStatus(String(e.message || e), "error")));
+  if ($("lyrics")) $("lyrics").addEventListener("input", paintSongCheck);
   initGrokImagine({
     addPhotos,
     replacePhotoAt,
     photoNames,
     evenOut: evenOutPhotoTimes,
+    writeSongPhotos,
   });
   initYoutube();
   const paintYtQueue = () => describeYtQueue(releaseMedia());

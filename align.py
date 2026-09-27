@@ -417,7 +417,7 @@ def main() -> None:
     p.add_argument("-o", "--output", type=Path)
     p.add_argument("-m", "--model", default="base")
     p.add_argument("-l", "--language", default="auto")
-    p.add_argument("--srt", type=Path, help="CapCut / existing SRT whose timings should be kept")
+    p.add_argument("--srt", type=Path, help="Existing SRT whose timings should be kept")
     p.add_argument("--keep-headers", action="store_true")
     p.add_argument("--energy-only", action="store_true")
     args = p.parse_args()
@@ -435,7 +435,7 @@ def main() -> None:
             sys.exit(f"No cues in {args.srt}")
         cues = reflow_lyrics_onto_srt(lines, cap)
         write_srt(out, cues)
-        print(f"Wrote {out} ({len(cues)} cues from {len(cap)} CapCut windows)")
+        print(f"Wrote {out} ({len(cues)} cues from {len(cap)} SRT windows)")
         return
     used = "energy"
     try:

@@ -240,7 +240,7 @@ function reflowLyricsOntoSrt(lines, srtCues) {
   const m = lyrics.length;
   const ratio = Math.min(n, m) / Math.max(n, m);
 
-  // Close cue counts: keep CapCut windows, group or split in order.
+  // Close cue counts: keep SRT windows, group or split in order.
   if (ratio >= 0.55) {
     if (m === n) {
       return lyrics.map((text, i) => ({
@@ -267,7 +267,7 @@ function reflowLyricsOntoSrt(lines, srtCues) {
         };
       });
     }
-    // More lyric lines than CapCut cues: split each window by character weight.
+    // More lyric lines than SRT cues: split each window by character weight.
     const out = [];
     let li = 0;
     for (let ci = 0; ci < n; ci++) {
@@ -303,7 +303,7 @@ function reflowLyricsOntoSrt(lines, srtCues) {
     return out;
   }
 
-  // Counts differ a lot: walk CapCut speech time and place lines by length.
+  // Counts differ a lot: walk SRT speech time and place lines by length.
   const weights = lyrics.map(lineWeight);
   const sumW = weights.reduce((a, b) => a + b, 0) || 1;
   const total = srtCues.reduce((s, c) => s + Math.max(0.05, c.end - c.start), 0);
@@ -360,7 +360,7 @@ function snapToCapcutOnsets(cues, srtCues) {
 function applyCapcutTimes() {
   state.lines = parseLyrics(lyricsEl.value);
   if (!state.lines.length) return setStatus("Add the correct lyrics first.", "error");
-  if (!state.capcut.length) return setStatus("Drop a CapCut SRT first.", "error");
+  if (!state.capcut.length) return setStatus("Drop an SRT first.", "error");
   let mapped = alignLyricsToCapcutWords(state.lines, state.capcut);
   if (!mapped || !mapped.length) mapped = reflowLyricsOntoSrt(state.lines, state.capcut);
   mapped = snapToCapcutOnsets(mapped, state.capcut);
@@ -371,7 +371,7 @@ function applyCapcutTimes() {
   renderCurrent();
   const method = mapped[0]?.from || "capcut";
   setStatus(
-    `Used ${state.capcut.length} CapCut cues → ${state.cues.length} lyric lines (${method}). Words are yours; clocks are CapCut.`,
+    `Used ${state.capcut.length} SRT cues → ${state.cues.length} lyric lines (${method}). Words are yours; clocks are from the SRT.`,
     "ok"
   );
 }
@@ -620,7 +620,7 @@ function guessTimings() {
     applyCapcutTimes();
     return;
   }
-  if (!state.audioBuffer) return setStatus("Load audio first, or drop a CapCut SRT.", "error");
+  if (!state.audioBuffer) return setStatus("Load audio first, or drop an SRT.", "error");
   const spans = voicedSpans(state.audioBuffer);
   const totalVoice = spans.reduce((s, [a, b]) => s + (b - a), 0);
   const weights = state.cues.map((c) => Math.max(4, c.text.replace(/\s+/g, "").length));
@@ -779,13 +779,25 @@ function alignLyricsToWords(lines, words) {
 }
 
 async function downsampleMono16k(buffer) {
-  const src = buffer.getChannelData(0);
+  let src = buffer.getChannelData(0);
+  if (buffer.numberOfChannels > 1) {
+    const b = buffer.getChannelData(1);
+    const mix = new Float32Array(src.length);
+    for (let i = 0; i < src.length; i++) mix[i] = (src[i] + b[i]) * 0.5;
+    src = mix;
+  }
+  let peak = 1e-6;
+  for (let i = 0; i < src.length; i += 8) {
+    const a = Math.abs(src[i]);
+    if (a > peak) peak = a;
+  }
+  const gain = peak > 0.02 ? Math.min(0.95 / peak, 4) : 1;
   const ratio = buffer.sampleRate / 16000;
   const len = Math.floor(src.length / ratio);
   const out = new Float32Array(len);
   for (let i = 0; i < len; i++) {
     const i0 = Math.floor(i * ratio);
-    out[i] = src[i0];
+    out[i] = Math.max(-1, Math.min(1, src[i0] * gain));
   }
   return out;
 }
@@ -799,8 +811,15 @@ async function aiAlign() {
   setStatus("Loading Whisper in the browser (first time can take a minute)…");
   try {
     const { pipeline } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1");
+    const lang = $("lang").value;
+    const model = $("whisperModel")?.value || "Xenova/whisper-base.en";
+    if (state.whisperModel !== model) {
+      state.whisper = null;
+      state.whisperModel = model;
+    }
     if (!state.whisper) {
-      state.whisper = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny", {
+      setStatus(`Loading ${model.split("/").pop()} (first time downloads into this browser)…`);
+      state.whisper = await pipeline("automatic-speech-recognition", model, {
         dtype: "q8",
         progress_callback: (info) => {
           if (info.status === "progress" && info.total) {
@@ -813,16 +832,20 @@ async function aiAlign() {
     setProgress(0.58);
     setStatus("Transcribing for timestamps. Your lyric words are kept.");
     const audio = await downsampleMono16k(state.audioBuffer);
-    const lang = $("lang").value;
     const options = {
       return_timestamps: "word",
       chunk_length_s: 30,
       stride_length_s: 5,
     };
-    if (lang !== "auto") options.language = lang;
-    const result = await state.whisper(audio, options);
+    if (lang !== "auto" && lang !== "en") options.language = lang;
+    let result = await state.whisper(audio, options);
+    let chunks = result.chunks || [];
+    if (chunks.length < 8) {
+      setStatus("Word times were thin. Trying line-level timestamps…");
+      result = await state.whisper(audio, { ...options, return_timestamps: true });
+      chunks = result.chunks || chunks;
+    }
     const words = [];
-    const chunks = result.chunks || [];
     chunks.forEach((ch) => {
       const ts = ch.timestamp || [null, null];
       words.push({
@@ -833,7 +856,7 @@ async function aiAlign() {
     });
     setProgress(0.9);
     if (!words.length) {
-      setStatus("Whisper returned no word times. Using energy guess instead.", "error");
+      setStatus("Whisper returned no times. Using energy guess instead.", "error");
       guessTimings();
       return;
     }
@@ -942,7 +965,7 @@ bindDrop($("srtDrop"), $("srtFile"), async (file) => {
   const raw = await file.text();
   const cues = parseSrt(raw);
   if (!cues.length) {
-    setStatus("Could not read that SRT. Export captions from CapCut as .srt and try again.", "error");
+    setStatus("Could not read that SRT. Export a .srt and try again.", "error");
     return;
   }
   state.capcut = cues;
@@ -951,7 +974,7 @@ bindDrop($("srtDrop"), $("srtFile"), async (file) => {
   markDirty();
   $("srtName").textContent = `${file.name} · ${cues.length} cues`;
   if (parseLyrics(lyricsEl.value).length) applyCapcutTimes();
-  else setStatus(`Loaded ${cues.length} CapCut cues. Add lyrics next, then times will attach.`);
+  else setStatus(`Loaded ${cues.length} SRT cues. Add lyrics next, then times will attach.`);
 });
 
 $("capcutBtn").addEventListener("click", applyCapcutTimes);
@@ -960,7 +983,7 @@ $("clearSrt").addEventListener("click", () => {
   state.capcutName = "";
   $("srtName").textContent = "";
   $("srtFile").value = "";
-  setStatus("CapCut SRT removed. Guess / AI / tap will build times from audio.");
+  setStatus("SRT removed. Guess / Auto time / tap will build times from audio.");
 });
 
 function lyricsChanged() {
@@ -1144,7 +1167,7 @@ async function applyProject(rec) {
   state.capcutRaw = rec.capcutRaw || "";
   state.capcut = rec.capcutRaw ? parseSrt(rec.capcutRaw) : [];
   $("srtName").textContent = state.capcut.length
-    ? `${state.capcutName || "CapCut SRT"} · ${state.capcut.length} cues`
+    ? `${state.capcutName || "SRT"} · ${state.capcut.length} cues`
     : "";
   if (rec.audioBlob) {
     const file =
@@ -1485,7 +1508,10 @@ function initProjects() {
   if (last) {
     getProject(last)
       .then((rec) => {
-        if (rec) return applyProject(rec);
+        if (rec) {
+          setStatus(`Opened last project “${rec.name}”.`, "ok");
+          return applyProject(rec);
+        }
       })
       .catch(() => {});
   }

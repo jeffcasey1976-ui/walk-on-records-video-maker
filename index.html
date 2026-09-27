@@ -17,8 +17,8 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 29 · 2026-09-27</span></h1>
-        <p>Best path: CapCut SRT for times + your lyrics for words. Then turn the timed lines into a 9:16 or 16:9 lyric video.</p>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 33 · 2026-09-27</span></h1>
+        <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
       </div>
       <div class="badge">Walk On Records</div>
     </header>
@@ -41,6 +41,17 @@
       <input id="projImportFile" type="file" accept=".wor.json,.json,application/json" hidden />
       <div id="projMeta" class="proj-meta">Not saved yet</div>
     </section>
+    <nav id="songCheck" class="song-check" aria-label="Song checklist">
+      <span data-chk="audio">Audio</span>
+      <span data-chk="lyrics">Lyrics</span>
+      <span data-chk="srt">SRT</span>
+      <span data-chk="stills">Stills</span>
+      <span data-chk="wide">16:9</span>
+      <span data-chk="tall">9:16</span>
+      <span data-chk="shorts">Shorts</span>
+      <span data-chk="pack">Pack</span>
+      <span data-chk="yt">YouTube</span>
+    </nav>
     <dialog id="projDialog" class="proj-dialog">
       <h3>Projects in this browser</h3>
       <p class="hint" style="margin-top:0">Each save is its own folder of files. Duplicate copies everything and leaves the original untouched. Delete removes it from this browser. Export downloads a <code>.wor.json</code> you can Import on another computer.</p>
@@ -57,6 +68,7 @@
           <strong>Drop WAV / MP3 / M4A / OGG here</strong>
           tap to choose a file
           <div id="audioName" class="file-name"></div>
+          <p id="loudnessNote" class="hint"></p>
         </div>
         <input id="audioFile" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac" hidden />
 
@@ -90,27 +102,19 @@
     </section>
 
     <section class="card" style="margin-top:16px">
-      <h2>3. CapCut SRT (recommended)</h2>
-      <p class="hint" style="margin-top:0">Export captions from CapCut, then drop that file here. Walk On Records Video Maker keeps CapCut’s start/end times and replaces the words with your lyrics. CapCut text can be wrong — that is expected.</p>
-      <div id="srtDrop" class="drop">
-        <strong>Drop CapCut .srt here</strong>
-        optional — without it, Guess / AI / Tap still work
-        <div id="srtName" class="file-name"></div>
-      </div>
-      <input id="srtFile" type="file" accept=".srt,.vtt,text/plain" hidden />
-      <div class="btn-row">
-        <button id="capcutBtn" type="button">Apply CapCut times to lyrics</button>
-        <button id="clearSrt" class="ghost" type="button">Remove CapCut SRT</button>
-      </div>
-    </section>
-
-    <section class="card" style="margin-top:16px">
-      <h2>4. Time the lines</h2>
+      <h2>3. Time the lines</h2>
       <div class="row">
+        <label style="margin:0">Whisper model
+          <select id="whisperModel">
+            <option value="Xenova/whisper-tiny.en">Fast · tiny (weak on singing)</option>
+            <option value="Xenova/whisper-base.en" selected>Better · base (recommended)</option>
+            <option value="Xenova/whisper-small.en">Best in browser · small (slower, ~500MB first time)</option>
+          </select>
+        </label>
         <label style="margin:0">Language hint
           <select id="lang">
+            <option value="en" selected>English</option>
             <option value="auto">auto</option>
-            <option value="en">English</option>
             <option value="es">Spanish</option>
             <option value="fr">French</option>
             <option value="de">German</option>
@@ -123,8 +127,8 @@
         </label>
       </div>
       <div class="btn-row">
-        <button id="guessBtn" type="button">Guess timings</button>
-        <button id="aiBtn" class="accent" type="button">AI align in browser</button>
+        <button id="aiBtn" class="accent" type="button">Auto time from audio</button>
+        <button id="guessBtn" class="secondary" type="button">Guess by energy</button>
         <button id="tapBtn" class="secondary" type="button">Start tap sync</button>
         <button id="resetTimes" class="ghost" type="button">Clear times</button>
       </div>
@@ -132,7 +136,22 @@
         <div class="progress" id="progress"><span></span></div>
         <span id="progressPct" class="progress-pct" hidden>0%</span>
       </div>
-      <div class="status" id="status">Drop a CapCut SRT plus lyrics for the tightest result. No SRT? Use Guess, AI, or tap sync.</div>
+      <div class="status" id="status">Load audio and lyrics, then Auto time from audio. First run downloads a small Whisper model into this browser. An SRT file is only a backup.</div>
+
+      <details class="hint" style="margin-top:12px">
+        <summary>Optional: SRT backup</summary>
+        <p>If Auto time drifts on a sung line, drop an SRT and apply those clocks to your words.</p>
+        <div id="srtDrop" class="drop">
+          <strong>Drop .srt here</strong>
+          optional
+          <div id="srtName" class="file-name"></div>
+        </div>
+        <input id="srtFile" type="file" accept=".srt,.vtt,text/plain" hidden />
+        <div class="btn-row">
+          <button id="capcutBtn" type="button">Apply SRT times to lyrics</button>
+          <button id="clearSrt" class="ghost" type="button">Remove SRT</button>
+        </div>
+      </details>
 
       <div class="current-line">
         <div class="kicker" id="lineMeta">Line 0 / 0</div>
@@ -146,12 +165,12 @@
     </section>
 
     <section class="card" style="margin-top:16px">
-      <h2>5. Cues</h2>
+      <h2>4. Cues</h2>
       <div id="cues" class="cues"></div>
     </section>
 
     <section class="card" style="margin-top:16px">
-      <h2>6. Lyric video</h2>
+      <h2>5. Lyric video</h2>
       <p class="hint" style="margin-top:0">Photos or one loop clip plus audio is enough — lyrics and SRT are optional. If you add timed lyrics they scroll in the lower half. The top half stays picture-only so covers stay readable.</p>
 
       <div class="row video-opts">
@@ -280,6 +299,11 @@
           </div>
           <label for="grokRefNote">Look lock from a kept still</label>
           <input id="grokRefNote" type="text" style="width:100%;max-width:none" placeholder="Use look on a preview to fill this" />
+          <div class="btn-row">
+            <select id="grokLookLib"></select>
+            <button id="grokLookUse" class="secondary" type="button">Use look</button>
+            <button id="grokLookSave" class="secondary" type="button">Save look from preview</button>
+          </div>
           <label for="grokPrompt">Shot list / prompt</label>
           <textarea id="grokPrompt" class="release-copy" placeholder="One scene, or a numbered list. Fill shot list uses the song."></textarea>
           <div class="row video-opts">
@@ -390,10 +414,10 @@
           </select>
         </label>
         <label class="inline-check" style="align-self:end">
-          <input id="safeZone" type="checkbox" /> 9:16 safe zone
+          <input id="safeZone" type="checkbox" checked /> 9:16 safe zone
         </label>
       </div>
-      <p class="hint">Text look is the CapCut-style treatment (neon, sticker, 3D poster, torn paper, banner). Karaoke splits each CapCut line across its own start/end and lights the current word. Safe zone is preview-only.</p>
+      <p class="hint">Text look is the styled treatment (neon, sticker, 3D poster, torn paper, banner). Karaoke splits each timed line across its own start/end and lights the current word. Safe zone is preview-only.</p>
 
       <h3 class="subhead">Walk On Records look kit</h3>
       <div class="row video-opts">
@@ -460,7 +484,7 @@
           <input id="titleSize" type="number" min="2" max="14" step="0.5" value="5" />
         </label>
       </div>
-      <p class="hint">Lyrics and CapCut SRT are optional. Audio + photos or a loop is enough. Title motion, if on, drifts the title around the frame with no repeating path.</p>
+      <p class="hint">Lyrics and SRT are optional. Audio + photos or a loop is enough. Title motion, if on, drifts the title around the frame with no repeating path.</p>
 
       <h3 class="subhead">Like &amp; subscribe (end of video)</h3>
       <div id="endDrop" class="drop">
@@ -642,6 +666,7 @@
       </div>
       <input id="ytTagFile" type="file" accept=".txt,text/plain" hidden />
       <div class="btn-row">
+        <label class="inline-check"><input id="skipRerender" type="checkbox" checked /> Do not re-render files that already exist</label>
         <button id="releaseDesk" class="accent" type="button">Build release pack</button>
         <button id="releaseZipOnly" class="secondary" type="button">Download youtube + thumbs zip</button>
       </div>
@@ -668,7 +693,12 @@
             <option value="public">Public</option>
           </select>
         </label>
+        <label>Schedule
+          <input id="ytSchedule" type="datetime-local" />
+        </label>
       </div>
+      <p class="hint">Schedule forces Private until that time. Leave blank to use the privacy box. Pick which Shorts below after they render.</p>
+      <div id="ytShortPicks" class="btn-row"></div>
       <div class="checks">
         <label><input id="ytUpWide" type="checkbox" /> 16:9 landscape only</label>
         <label><input id="ytUpTall" type="checkbox" /> 9:16 full video only</label>
