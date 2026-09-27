@@ -1552,7 +1552,18 @@ window.addEventListener("wavesrt-ready", () => {
 
 lyricsEl.addEventListener("input", markDirty);
 
-initVideoMaker();
-initProjects();
-rebuildCuesKeepTimes();
+try {
+  initVideoMaker();
+} catch (err) {
+  console.error(err);
+  setStatus("Video panel failed to start. Reload app, then try again.", "error");
+}
+try {
+  initProjects();
+} catch (err) {
+  console.error(err);
+}
+try {
+  rebuildCuesKeepTimes();
+} catch (_) {}
 setStatus("Load a WAV and lyrics to start, or Open a saved project.");

@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 35 · 2026-09-27</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 36 · 2026-09-27</span></h1>
         <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -37,6 +37,7 @@
         <button id="projExport" class="secondary" type="button">Export</button>
         <button id="projImport" class="secondary" type="button">Import</button>
         <button id="appReload" class="ghost" type="button">Reload app</button>
+        <a id="appReloadLink" href="./?reload=now">Force refresh</a>
       </div>
       <input id="projImportFile" type="file" accept=".wor.json,.json,application/json" hidden />
       <div id="projMeta" class="proj-meta">Not saved yet</div>
@@ -728,6 +729,31 @@
       <button id="dockDownloadVideo" class="secondary" type="button" disabled>Download video</button>
     </div>
   </main>
+  <script>
+    async function hardReloadApp() {
+      try {
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+        if (window.caches) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      } catch (e) {}
+      const url = new URL(location.href);
+      url.searchParams.set("reload", String(Date.now()));
+      location.replace(url.toString());
+    }
+    document.getElementById("appReload")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      hardReloadApp();
+    });
+    document.getElementById("appReloadLink")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      hardReloadApp();
+    });
+  </script>
   <script src="./app.js" type="module"></script>
 </body>
 </html>
