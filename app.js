@@ -1105,7 +1105,9 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("resize", drawWave);
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  navigator.serviceWorker.register("./sw.js").catch(() => {});
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((r) => r.unregister());
+  }).catch(() => {});
 }
 
 function markDirty() {
