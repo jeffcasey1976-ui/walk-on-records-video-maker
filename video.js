@@ -30,7 +30,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "34";
+export const APP_REV = "35";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -2531,7 +2531,11 @@ async function loadSavedWatermark() {
 }
 
 function bindMultiDrop(box, input, onFiles) {
-  box.addEventListener("click", () => input.click());
+  if (!box || !input) return;
+  input.removeAttribute("hidden");
+  input.hidden = false;
+  input.classList.add("drop-input");
+  if (input.parentElement !== box) box.insertBefore(input, box.firstChild);
   box.addEventListener("dragover", (e) => {
     e.preventDefault();
     box.classList.add("over");

@@ -489,8 +489,18 @@ function enableExport() {
   window.dispatchEvent(new Event("wavesrt-ready"));
 }
 
+function wireDropInput(box, input) {
+  if (!box || !input) return;
+  input.removeAttribute("hidden");
+  input.hidden = false;
+  input.classList.add("drop-input");
+  if (input.parentElement !== box) box.insertBefore(input, box.firstChild);
+  box.classList.add("has-file-input");
+}
+
 function bindDrop(el, input, onFile) {
-  el.addEventListener("click", () => input.click());
+  if (!el || !input) return;
+  wireDropInput(el, input);
   el.addEventListener("dragover", (e) => {
     e.preventDefault();
     el.classList.add("over");
