@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 40 · 2026-09-27</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 42 · 2026-09-30</span></h1>
         <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -103,7 +103,22 @@
     </section>
 
     <section class="card" style="margin-top:16px">
-      <h2>3. Time the lines</h2>
+      <h2>3. SRT times</h2>
+      <p class="hint" style="margin-top:0">Drop any <code>.srt</code>. The maker keeps those start/end times and puts your lyric words on them.</p>
+      <div id="srtDrop" class="drop">
+        <strong>Drop .srt here</strong>
+        tap to choose a file
+        <div id="srtName" class="file-name"></div>
+      </div>
+      <input id="srtFile" type="file" accept=".srt,.vtt,text/plain" hidden />
+      <div class="btn-row">
+        <button id="capcutBtn" type="button">Apply SRT times to lyrics</button>
+        <button id="clearSrt" class="ghost" type="button">Remove SRT</button>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>4. Time without an SRT</h2>
       <div class="row">
         <label style="margin:0">Whisper model
           <select id="whisperModel">
@@ -137,41 +152,33 @@
         <div class="progress" id="progress"><span></span></div>
         <span id="progressPct" class="progress-pct" hidden>0%</span>
       </div>
-      <div class="status" id="status">Load audio and lyrics, then Auto time from audio. First run downloads a small Whisper model into this browser. An SRT file is only a backup.</div>
+      <div class="status" id="status">Best path: drop an SRT, then Apply SRT times. No SRT? Use Auto time, Guess, or tap.</div>
 
-      <details class="hint" style="margin-top:12px">
-        <summary>Optional: SRT backup</summary>
-        <p>If Auto time drifts on a sung line, drop an SRT and apply those clocks to your words.</p>
-        <div id="srtDrop" class="drop">
-          <strong>Drop .srt here</strong>
-          optional
-          <div id="srtName" class="file-name"></div>
+      <div class="tap-stage">
+        <div class="tap-preview-wrap" id="tapPreviewWrap">
+          <canvas id="tapPreview"></canvas>
         </div>
-        <input id="srtFile" type="file" accept=".srt,.vtt,text/plain" hidden />
-        <div class="btn-row">
-          <button id="capcutBtn" type="button">Apply SRT times to lyrics</button>
-          <button id="clearSrt" class="ghost" type="button">Remove SRT</button>
+        <div class="tap-stage-copy">
+          <div class="current-line">
+            <div class="kicker" id="lineMeta">Line 0 / 0</div>
+            <p id="lineText">Load lyrics to begin.</p>
+          </div>
+          <div class="tap-pad">
+            <button id="markStart" class="accent" type="button" disabled>Mark start</button>
+            <button id="markEnd" type="button" disabled>Mark end → next</button>
+          </div>
+          <p class="hint">On a keyboard: <b>Space</b> starts a line, Space again ends it and advances. <b>← / →</b> skip 2 seconds. Phone: use the two buttons. Load photos or a loop first if you want the picture here while you tap.</p>
         </div>
-      </details>
-
-      <div class="current-line">
-        <div class="kicker" id="lineMeta">Line 0 / 0</div>
-        <p id="lineText">Load lyrics to begin.</p>
       </div>
-      <div class="tap-pad">
-        <button id="markStart" class="accent" type="button" disabled>Mark start</button>
-        <button id="markEnd" type="button" disabled>Mark end → next</button>
-      </div>
-      <p class="hint">On a keyboard: <b>Space</b> starts a line, Space again ends it and advances. <b>← / →</b> skip 2 seconds. Phone: use the two buttons.</p>
     </section>
 
     <section class="card" style="margin-top:16px">
-      <h2>4. Cues</h2>
+      <h2>5. Cues</h2>
       <div id="cues" class="cues"></div>
     </section>
 
     <section class="card" style="margin-top:16px">
-      <h2>5. Lyric video</h2>
+      <h2>6. Lyric video</h2>
       <p class="hint" style="margin-top:0">Photos or one loop clip plus audio is enough — lyrics and SRT are optional. If you add timed lyrics they scroll in the lower half. The top half stays picture-only so covers stay readable.</p>
 
       <div class="row video-opts">

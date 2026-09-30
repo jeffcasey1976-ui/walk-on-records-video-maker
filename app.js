@@ -1101,12 +1101,16 @@ $("tapBtn").addEventListener("click", async () => {
   state.active = state.cues.findIndex((c) => c.start == null);
   if (state.active < 0) state.active = 0;
   renderCurrent();
+  $("tapPreviewWrap")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  try {
+    paintPreview(player.currentTime || 0);
+  } catch (_) {}
   if (player.src && player.paused) {
     try {
       await player.play();
     } catch (_) {}
   }
-  setStatus("Tap sync on. Mark start when the line begins, mark end when it finishes.", "ok");
+  setStatus("Tap sync on. Watch the preview next to the line. Mark start when the line begins, mark end when it finishes.", "ok");
 });
 $("resetTimes").addEventListener("click", () => {
   state.cues.forEach((c) => {
@@ -1573,17 +1577,6 @@ function initProjects() {
       saveProject().catch(() => {});
     }
   });
-  const last = localStorage.getItem("wavesrt-last-project");
-  if (last) {
-    getProject(last)
-      .then((rec) => {
-        if (rec) {
-          setStatus(`Opened last project “${rec.name}”.`, "ok");
-          return applyProject(rec);
-        }
-      })
-      .catch(() => {});
-  }
   updateProjMeta();
 }
 

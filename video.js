@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "38";
+export const APP_REV = "42";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1289,6 +1289,15 @@ function sizePreviewCanvas() {
   const { w, h } = targetSize();
   const wrap = $("videoPreviewWrap");
   wrap.classList.toggle("wide", $("aspect").value === "16:9");
+  const tap = $("tapPreview");
+  const tapWrap = $("tapPreviewWrap");
+  if (tap && tapWrap) {
+    tapWrap.classList.toggle("wide", $("aspect").value === "16:9");
+    const maxW = 240;
+    const scale = Math.min(1, maxW / w);
+    tap.width = Math.max(80, Math.round(w * scale));
+    tap.height = Math.max(80, Math.round(h * scale));
+  }
   const rect = wrap.getBoundingClientRect();
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const cssW = Math.max(160, rect.width);
@@ -1332,13 +1341,24 @@ function syncReviewSlider(t) {
 }
 
 export function paintPreview(t) {
-  const canvas = previewCanvas();
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  drawFrame(ctx, canvas.width, canvas.height, t || 0);
-  if ($("safeZone")?.checked) drawSafeZone(ctx, canvas.width, canvas.height);
-  updateStripPlayhead(t || 0);
-  if (!videoState.scrubbing) syncReviewSlider(t || 0);
+  const time = t || 0;
+  const paintOne = (canvas) => {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!canvas.width || !canvas.height) {
+      const { w, h } = targetSize();
+      const maxW = canvas.id === "tapPreview" ? 220 : 720;
+      const scale = Math.min(1, maxW / w);
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+    }
+    drawFrame(ctx, canvas.width, canvas.height, time);
+    if ($("safeZone")?.checked) drawSafeZone(ctx, canvas.width, canvas.height);
+  };
+  paintOne(previewCanvas());
+  paintOne($("tapPreview"));
+  updateStripPlayhead(time);
+  if (!videoState.scrubbing) syncReviewSlider(time);
 }
 
 function syncPreviewFromPlayer() {
