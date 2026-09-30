@@ -672,50 +672,100 @@ function voicedSpans(buffer) {
   return merged;
 }
 
-function guessTimings() {
+function syllableWeight(text) {
+  const words = String(text || "").toLowerCase().match(/[a-z']+/g) || [];
+  let n = 0;
+  words.forEach((w) => {
+    const groups = w.replace(/[^aeiouy]+/g, " ").trim().split(/\s+/).filter(Boolean);
+    n += Math.max(1, groups.length);
+  });
+  return Math.max(2, n);
+}
+
+function singingSpans(buffer) {
+  let spans = voicedSpans(buffer).filter(([a, b]) => b - a >= 0.4);
+  while (spans.length > 1 && spans[0][0] < 4 && spans[0][1] - spans[0][0] < 2.2) spans.shift();
+  if (spans.length > 2 && spans[0][0] < 8) {
+    const rest = spans.slice(1).reduce((s, [a, b]) => s + (b - a), 0);
+    if (spans[0][1] - spans[0][0] < rest * 0.12) spans = spans.slice(1);
+  }
+  return spans.length ? spans : voicedSpans(buffer);
+}
+
+function nearestOnset(env, hopSec, t, window = 0.4) {
+  const i0 = Math.max(1, Math.floor((t - window) / hopSec));
+  const i1 = Math.min(env.length - 1, Math.floor((t + window * 0.25) / hopSec));
+  let bestI = Math.max(0, Math.floor(t / hopSec));
+  let best = -1;
+  for (let i = i0; i <= i1; i++) {
+    const rise = env[i] - env[i - 1];
+    if (rise > best) {
+      best = rise;
+      bestI = i;
+    }
+  }
+  return bestI * hopSec;
+}
+
+function fitLyricsToAudio() {
   rebuildCuesKeepTimes();
   if (!state.cues.length) return setStatus("Add lyrics first.", "error");
-  if (state.capcut.length) {
-    applyCapcutTimes();
-    return;
-  }
-  if (!state.audioBuffer) return setStatus("Load audio first, or drop an SRT.", "error");
-  const spans = voicedSpans(state.audioBuffer);
+  if (!state.audioBuffer) return setStatus("Load audio first.", "error");
+  const spans = singingSpans(state.audioBuffer);
   const totalVoice = spans.reduce((s, [a, b]) => s + (b - a), 0);
-  const weights = state.cues.map((c) => Math.max(4, c.text.replace(/\s+/g, "").length));
-  const sumW = weights.reduce((a, b) => a + b, 0);
-  let cursor = 0;
-  const gap = 0.06;
+  if (totalVoice < 1) return setStatus("Could not find a vocal in that audio.", "error");
+  const { env, hopSec } = rmsEnvelope(state.audioBuffer, 0.01);
+  const weights = state.cues.map((c) => syllableWeight(c.text));
+  const sumW = weights.reduce((a, b) => a + b, 0) || 1;
+  const minLine = Math.min(1.8, Math.max(0.75, totalVoice / state.cues.length * 0.4));
+  const raw = weights.map((w) => Math.max(minLine, (w / sumW) * totalVoice));
+  const rawSum = raw.reduce((a, b) => a + b, 0) || 1;
+  const needs = raw.map((n) => (n / rawSum) * totalVoice);
+  let si = 0;
+  let used = 0;
+  const pos = () => {
+    const [a] = spans[Math.min(si, spans.length - 1)];
+    return a + used;
+  };
   state.cues.forEach((cue, i) => {
-    const need = Math.max(0.45, (weights[i] / sumW) * totalVoice);
-    let placed = 0;
-    let start = null;
-    let end = null;
-    for (const [a, b] of spans) {
-      const avail = b - a;
-      if (cursor >= b) continue;
-      const from = Math.max(a, cursor);
-      const take = Math.min(need - placed, b - from);
-      if (take <= 0) continue;
-      if (start == null) start = from;
-      end = from + take;
-      placed += take;
-      cursor = end + gap;
-      if (placed >= need * 0.98) break;
+    let need = needs[i];
+    let start = pos();
+    start = nearestOnset(env, hopSec, start, 0.35);
+    if (i > 0 && state.cues[i - 1].end != null) start = Math.max(start, state.cues[i - 1].end + 0.04);
+    let guard = 0;
+    while (si < spans.length && start > spans[si][1] && guard++ < spans.length) {
+      si += 1;
+      used = 0;
     }
-    if (start == null) {
-      const t = Math.min(state.duration - 0.4, i * (state.duration / state.cues.length));
-      start = t;
-      end = Math.min(state.duration, t + need);
+    if (si < spans.length) start = Math.max(start, spans[si][0]);
+    used = Math.max(0, start - spans[Math.min(si, spans.length - 1)][0]);
+    while (need > 0.001 && si < spans.length) {
+      const [a, b] = spans[si];
+      const avail = Math.max(0, b - a - used);
+      const take = Math.min(avail, need);
+      used += take;
+      need -= take;
+      if (used >= b - a - 0.001) {
+        si += 1;
+        used = 0;
+      }
     }
+    let end = Math.max(start + minLine, pos());
+    if (i === state.cues.length - 1) end = Math.max(end, spans[spans.length - 1][1]);
     cue.start = Math.max(0, start);
-    cue.end = Math.max(cue.start + 0.35, end ?? start + need);
+    cue.end = Math.min(state.duration || end, Math.max(cue.start + 0.7, end));
   });
   snapCues();
   state.active = 0;
   renderCues();
   renderCurrent();
-  setStatus(`Guessed ${state.cues.length} cues from loudness. Tap-sync any line that drifts.`, "ok");
+  const a = fmtClock(state.cues[0].start);
+  const b = fmtClock(state.cues[state.cues.length - 1].end);
+  setStatus(`Fit ${state.cues.length} lyric lines to the vocal (${a}–${b}). Tap any line that still drifts.`, "ok");
+}
+
+function guessTimings() {
+  fitLyricsToAudio();
 }
 
 function snapCues() {
