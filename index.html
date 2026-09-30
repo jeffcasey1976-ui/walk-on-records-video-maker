@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 46 · 2026-09-30</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 47 · 2026-09-30</span></h1>
         <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -155,12 +155,12 @@
       <div class="status" id="status">Best path: drop an SRT, then Apply SRT times. No SRT? Use Auto time, Guess, or tap.</div>
 
       <div class="srt-transport" id="srtTransport">
-        <button id="srtPlay" class="accent" type="button">Play</button>
-        <button id="srtBack" class="ghost" type="button">−2s</button>
-        <button id="srtFwd" class="ghost" type="button">+2s</button>
-        <button id="srtReplayLine" class="secondary" type="button">Replay line</button>
+        <button id="srtPlay" class="accent" type="button" onclick="window.worTogglePlay()">Play</button>
+        <button id="srtBack" class="ghost" type="button" onclick="window.worSkip(-2)">−2s</button>
+        <button id="srtFwd" class="ghost" type="button" onclick="window.worSkip(2)">+2s</button>
+        <button id="srtReplayLine" class="secondary" type="button" onclick="window.worReplayLine()">Replay line</button>
         <label class="speed-label">Speed
-          <select id="srtSpeed">
+          <select id="srtSpeed" onchange="window.worSetSpeed(this.value)">
             <option value="0.5">50%</option>
             <option value="0.75">75%</option>
             <option value="1" selected>100%</option>
@@ -780,6 +780,68 @@
       e.preventDefault();
       hardReloadApp();
     });
+
+    function worPlayer() { return document.getElementById("player"); }
+    function worSyncPlayLabels() {
+      const p = worPlayer();
+      const label = !p || p.paused ? "Play" : "Pause";
+      ["srtPlay", "playBtn", "reviewPlay"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = label;
+      });
+      const clock = document.getElementById("srtTime");
+      if (clock && p) {
+        const t = p.currentTime || 0;
+        const m = Math.floor(t / 60);
+        const s = t % 60;
+        clock.textContent = String(m).padStart(2, "0") + ":" + s.toFixed(2).padStart(5, "0");
+      }
+    }
+    window.worTogglePlay = async function () {
+      const p = worPlayer();
+      if (!p || !p.src) {
+        alert("Load audio in section 1 first.");
+        return;
+      }
+      const speed = document.getElementById("srtSpeed");
+      if (speed) p.playbackRate = Number(speed.value) || 1;
+      try {
+        if (p.paused) await p.play();
+        else p.pause();
+      } catch (err) {
+        alert("Play blocked. Tap Play once more.");
+      }
+      worSyncPlayLabels();
+    };
+    window.worSkip = function (secs) {
+      const p = worPlayer();
+      if (!p) return;
+      p.currentTime = Math.max(0, (p.currentTime || 0) + secs);
+      worSyncPlayLabels();
+    };
+    window.worReplayLine = function () {
+      const p = worPlayer();
+      if (!p || !p.src) return alert("Load audio first.");
+      const active = document.querySelector(".cue.active input[data-k='start']");
+      const raw = active && active.value;
+      let start = 0;
+      if (raw && raw.indexOf(":") >= 0) {
+        const parts = raw.split(":");
+        start = Number(parts[0]) * 60 + Number(parts[1] || 0);
+      }
+      p.currentTime = Math.max(0, start - 0.05);
+      const speed = document.getElementById("srtSpeed");
+      if (speed) p.playbackRate = Number(speed.value) || 1;
+      p.play().catch(function () {});
+      worSyncPlayLabels();
+    };
+    window.worSetSpeed = function (v) {
+      const p = worPlayer();
+      if (p) p.playbackRate = Number(v) || 1;
+    };
+    document.getElementById("player")?.addEventListener("timeupdate", worSyncPlayLabels);
+    document.getElementById("player")?.addEventListener("play", worSyncPlayLabels);
+    document.getElementById("player")?.addEventListener("pause", worSyncPlayLabels);
   </script>
   <script src="./app.js" type="module"></script>
 </body>
