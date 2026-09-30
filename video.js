@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "42";
+export const APP_REV = "46";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1345,12 +1345,14 @@ export function paintPreview(t) {
   const paintOne = (canvas) => {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    if (!canvas.width || !canvas.height) {
-      const { w, h } = targetSize();
-      const maxW = canvas.id === "tapPreview" ? 220 : 720;
-      const scale = Math.min(1, maxW / w);
-      canvas.width = Math.round(w * scale);
-      canvas.height = Math.round(h * scale);
+    const { w, h } = targetSize();
+    const maxW = canvas.id === "tapPreview" ? 240 : 720;
+    const scale = Math.min(1, maxW / Math.max(1, w));
+    const tw = Math.max(80, Math.round(w * scale));
+    const th = Math.max(80, Math.round(h * scale));
+    if (canvas.width !== tw || canvas.height !== th) {
+      canvas.width = tw;
+      canvas.height = th;
     }
     drawFrame(ctx, canvas.width, canvas.height, time);
     if ($("safeZone")?.checked) drawSafeZone(ctx, canvas.width, canvas.height);
@@ -3211,22 +3213,59 @@ export function initVideoMaker() {
     });
   }
   const syncPlayBtn = () => {
-    const btn = $("reviewPlay");
-    if (btn) btn.textContent = $("player").paused ? "Play" : "Pause";
-  };
-  if ($("reviewPlay")) {
-    $("reviewPlay").addEventListener("click", async () => {
-      const player = $("player");
-      if (!player.src) return setStatus("Load audio first.", "error");
-      if (player.paused) {
-        try {
-          await player.play();
-        } catch (_) {
-          setStatus("Tap Play again after Chrome allows sound.", "error");
-        }
-      } else player.pause();
-      syncPlayBtn();
+    const paused = $("player")?.paused !== false;
+    ["reviewPlay", "srtPlay", "playBtn"].forEach((id) => {
+      if ($(id)) $(id).textContent = paused ? "Play" : "Pause";
     });
+  };
+  const toggleMainPlayer = async () => {
+    const player = $("player");
+    if (!player?.src) return setStatus("Load audio first.", "error");
+    const rate = Number($("srtSpeed")?.value || player.playbackRate || 1);
+    player.playbackRate = rate || 1;
+    if (player.paused) {
+      try {
+        await player.play();
+      } catch (_) {
+        setStatus("Tap Play again after Chrome allows sound.", "error");
+      }
+    } else player.pause();
+    syncPlayBtn();
+    paintPreview(player.currentTime || 0);
+  };
+  if ($("reviewPlay")) $("reviewPlay").addEventListener("click", () => toggleMainPlayer());
+  if ($("srtPlay")) $("srtPlay").addEventListener("click", () => toggleMainPlayer());
+  if ($("srtBack")) $("srtBack").addEventListener("click", () => {
+    const p = $("player");
+    p.currentTime = Math.max(0, (p.currentTime || 0) - 2);
+    paintPreview(p.currentTime);
+  });
+  if ($("srtFwd")) $("srtFwd").addEventListener("click", () => {
+    const p = $("player");
+    p.currentTime = Math.min(p.duration || 9e4, (p.currentTime || 0) + 2);
+    paintPreview(p.currentTime);
+  });
+  if ($("srtReplayLine")) {
+    $("srtReplayLine").addEventListener("click", () => {
+      const cue = state.cues[state.active];
+      if (!cue || cue.start == null) return setStatus("Time a line first, then Replay line.", "error");
+      const p = $("player");
+      p.currentTime = Math.max(0, cue.start - 0.05);
+      p.playbackRate = Number($("srtSpeed")?.value || 1);
+      p.play().catch(() => {});
+      paintPreview(p.currentTime);
+    });
+  }
+  if ($("srtSpeed")) {
+    $("srtSpeed").addEventListener("change", () => {
+      const p = $("player");
+      p.playbackRate = Number($("srtSpeed").value) || 1;
+      setStatus(`Playback ${Math.round(p.playbackRate * 100)}%.`, "ok");
+    });
+  }
+  if ($("tapPreview")) {
+    $("tapPreview").style.cursor = "pointer";
+    $("tapPreview").addEventListener("click", () => toggleMainPlayer());
   }
   if ($("markShortStart")) {
     $("markShortStart").addEventListener("click", () => {
