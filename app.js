@@ -478,8 +478,10 @@ function renderCurrent() {
   $("lineMeta").textContent = n ? `Line ${state.active + 1} / ${n}` : "Line 0 / 0";
   $("lineText").textContent = n ? state.cues[state.active].text : "Load lyrics to begin.";
   const ready = n > 0 && state.duration > 0;
-  $("markStart").disabled = !ready;
-  $("markEnd").disabled = !ready;
+  if ($("markStart")) $("markStart").disabled = !ready;
+  if ($("markEnd")) $("markEnd").disabled = !ready;
+  if ($("nudgeEarly")) $("nudgeEarly").disabled = !ready;
+  if ($("nudgeLate")) $("nudgeLate").disabled = !ready;
   document.querySelectorAll(".cue").forEach((el, i) => el.classList.toggle("active", i === state.active));
 }
 
@@ -615,6 +617,20 @@ function drawWave() {
     ctx.fillRect(x, mid - h / 2, Math.max(1, w * 0.7), h);
   }
   ctx.globalAlpha = 1;
+  const dur = state.duration || 0;
+  if (dur && state.cues.length) {
+    state.cues.forEach((cue, i) => {
+      if (cue.start == null) return;
+      const x0 = (cue.start / dur) * canvas.width;
+      const x1 = ((cue.end ?? Math.min(dur, cue.start + 1.2)) / dur) * canvas.width;
+      ctx.fillStyle = i === state.active ? "rgba(46,230,166,0.28)" : "rgba(124,92,255,0.18)";
+      ctx.fillRect(x0, 0, Math.max(2, x1 - x0), canvas.height);
+      if (i === state.active) {
+        ctx.strokeStyle = "rgba(46,230,166,0.9)";
+        ctx.strokeRect(x0, 1, Math.max(2, x1 - x0), canvas.height - 2);
+      }
+    });
+  }
 }
 
 function seekTo(t) {
@@ -628,6 +644,8 @@ function updatePlayhead() {
   $("seek").value = dur ? String(Math.round((t / dur) * 1000)) : "0";
   $("playhead").style.left = dur ? `${(t / dur) * 100}%` : "0";
   $("playBtn").textContent = player.paused ? "Play" : "Pause";
+  if ($("srtPlay")) $("srtPlay").textContent = player.paused ? "Play" : "Pause";
+  if ($("srtTime")) $("srtTime").textContent = fmtClock(t);
 }
 
 function rmsEnvelope(buffer, hopSec = 0.02) {
@@ -1033,19 +1051,31 @@ function download(name, text) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1500);
 }
 
-function markStart() {
+function tapLine() {
   if (!state.cues.length) return;
   const t = player.currentTime || 0;
-  const cue = state.cues[state.active];
-  cue.start = t;
-  if (state.active > 0) {
-    const prev = state.cues[state.active - 1];
-    if (prev.end == null || prev.end > t) prev.end = Math.max((prev.start ?? 0) + 0.2, t - 0.05);
+  const i = state.active;
+  if (i > 0) {
+    const prev = state.cues[i - 1];
+    if (prev.start != null && (prev.end == null || prev.end > t)) {
+      prev.end = Math.max(prev.start + 0.25, t - 0.04);
+    }
   }
-  state.tapPhase = "end";
+  const cue = state.cues[i];
+  cue.start = t;
+  if (cue.end != null && cue.end <= t) cue.end = null;
+  state.tapPhase = "start";
+  if (i < state.cues.length - 1) state.active = i + 1;
+  else if (cue.end == null) cue.end = Math.min(state.duration || t + 1.5, t + 1.5);
   renderCues();
   renderCurrent();
-  buzz(12);
+  drawWave();
+  buzz(14);
+  setStatus(`Line ${Math.min(i + 1, state.cues.length)} in at ${fmtClock(t)}. Tap again when the next line starts.`, "ok");
+}
+
+function markStart() {
+  tapLine();
 }
 
 function markEnd() {
@@ -1111,16 +1141,36 @@ lyricsEl.addEventListener("change", lyricsChanged);
 $("keepHeaders").addEventListener("change", lyricsChanged);
 $("splitLong").addEventListener("change", lyricsChanged);
 
-$("playBtn").addEventListener("click", async () => {
-  if (!player.src) return;
+async function togglePlay() {
+  if (!player.src) return setStatus("Load audio first.", "error");
   if (player.paused) {
     try {
       await player.play();
-    } catch (e) {
-      setStatus("Could not play. Tap Play again after a user gesture.", "error");
+    } catch (err) {
+      setStatus(String(err.message || err), "error");
     }
   } else player.pause();
-});
+}
+
+function replayActiveLine() {
+  const cue = state.cues[state.active];
+  if (!cue || cue.start == null) return setStatus("Time a line first, then Replay line.", "error");
+  seekTo(Math.max(0, cue.start - 0.05));
+  player.playbackRate = Number($("srtSpeed")?.value || 1);
+  player.play().catch(() => {});
+}
+
+$("playBtn").addEventListener("click", () => togglePlay());
+if ($("srtPlay")) $("srtPlay").addEventListener("click", () => togglePlay());
+if ($("srtBack")) $("srtBack").addEventListener("click", () => seekTo((player.currentTime || 0) - 2));
+if ($("srtFwd")) $("srtFwd").addEventListener("click", () => seekTo((player.currentTime || 0) + 2));
+if ($("srtReplayLine")) $("srtReplayLine").addEventListener("click", replayActiveLine);
+if ($("srtSpeed")) {
+  $("srtSpeed").addEventListener("change", () => {
+    player.playbackRate = Number($("srtSpeed").value) || 1;
+    setStatus(`Playback ${Math.round(player.playbackRate * 100)}%.`, "ok");
+  });
+}
 
 $("seek").addEventListener("input", () => {
   const dur = state.duration || player.duration || 0;
@@ -1160,7 +1210,7 @@ $("tapBtn").addEventListener("click", async () => {
       await player.play();
     } catch (_) {}
   }
-  setStatus("Tap sync on. Watch the preview next to the line. Mark start when the line begins, mark end when it finishes.", "ok");
+  setStatus("One-tap mode. Hit Tap line (or Space) each time a new line starts. Then use −0.2 / +0.2 on a late line.", "ok");
 });
 $("resetTimes").addEventListener("click", () => {
   state.cues.forEach((c) => {
@@ -1172,8 +1222,30 @@ $("resetTimes").addEventListener("click", () => {
   renderCurrent();
   setStatus("Times cleared. Lyric text kept.");
 });
-$("markStart").addEventListener("click", markStart);
-$("markEnd").addEventListener("click", markEnd);
+function nudgeActive(delta) {
+  const cue = state.cues[state.active];
+  if (!cue || cue.start == null) return setStatus("Tap or fit a line first, then nudge.", "error");
+  cue.start = Math.max(0, cue.start + delta);
+  if (cue.end != null) cue.end = Math.max(cue.start + 0.2, cue.end + delta);
+  if (state.active > 0) {
+    const prev = state.cues[state.active - 1];
+    if (prev.end != null && prev.end > cue.start) prev.end = Math.max((prev.start ?? 0) + 0.2, cue.start - 0.04);
+  }
+  if (state.active + 1 < state.cues.length) {
+    const next = state.cues[state.active + 1];
+    if (next.start != null && cue.end != null && cue.end > next.start) cue.end = Math.max(cue.start + 0.2, next.start - 0.04);
+  }
+  renderCues();
+  renderCurrent();
+  drawWave();
+  seekTo(cue.start);
+  setStatus(`Line ${state.active + 1} shifted ${delta > 0 ? "+" : ""}${delta.toFixed(1)}s → ${fmtClock(cue.start)}.`, "ok");
+}
+
+if ($("markStart")) $("markStart").addEventListener("click", tapLine);
+if ($("markEnd")) $("markEnd").addEventListener("click", markEnd);
+if ($("nudgeEarly")) $("nudgeEarly").addEventListener("click", () => nudgeActive(-0.2));
+if ($("nudgeLate")) $("nudgeLate").addEventListener("click", () => nudgeActive(0.2));
 
 $("downloadSrt").addEventListener("click", () => download(`${state.fileName}.srt`, toSrt()));
 $("downloadLrc").addEventListener("click", () => download(`${state.fileName}.lrc`, toLrc()));
@@ -1187,8 +1259,7 @@ window.addEventListener("keydown", (e) => {
   if (tag === "TEXTAREA" || tag === "INPUT") return;
   if (e.code === "Space") {
     e.preventDefault();
-    if (state.tapPhase === "end" && state.cues[state.active]?.start != null) markEnd();
-    else markStart();
+    tapLine();
   } else if (e.code === "ArrowLeft") {
     e.preventDefault();
     seekTo((player.currentTime || 0) - 2);

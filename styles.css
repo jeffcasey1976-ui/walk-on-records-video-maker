@@ -149,6 +149,7 @@ input[type="range"] { flex: 1; accent-color: var(--accent-2); }
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;
 }
 .tap-pad button { min-height: 64px; font-size: 1rem; }
+.tap-pad-one { grid-template-columns: 1fr; }
 .tap-stage { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 12px; align-items: start; margin-top: 12px; }
 .tap-preview-wrap { background: #07090e; border-radius: 12px; overflow: hidden; border: 1px solid var(--line, #2a3144); display: flex; justify-content: center; }
 .tap-preview-wrap canvas { display: block; width: 100%; height: auto; max-height: 360px; }
@@ -158,6 +159,16 @@ input[type="range"] { flex: 1; accent-color: var(--accent-2); }
   .tap-stage { grid-template-columns: 1fr; }
   .tap-preview-wrap { max-width: 220px; }
 }
+
+.srt-transport {
+  position: sticky; top: 8px; z-index: 8;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 12px 0; padding: 10px 12px; border-radius: 14px;
+  background: #12151d; border: 1px solid #2a3144;
+}
+.srt-transport .time { font-variant-numeric: tabular-nums; color: var(--muted); }
+.speed-label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--muted); margin: 0; }
+
 .hint { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
 
 .cues { max-height: 420px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
