@@ -242,10 +242,11 @@ input[type="number"] { width: 100%; max-width: 140px; }
 }
 .photo-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .photo-item {
-  display: grid; grid-template-columns: 1.6rem minmax(0,1fr) auto auto auto auto;
+  display: grid; grid-template-columns: auto auto auto minmax(0,1fr) auto auto auto auto;
   gap: 6px; align-items: center;
   background: #10131a; border: 1px solid var(--line); border-radius: 10px;
   padding: 6px 8px; font-size: 0.78rem; color: var(--muted);
+  position: relative; z-index: 2;
 }
 .photo-item .ord { color: var(--accent-2); font-weight: 700; }
 .photo-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }

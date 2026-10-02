@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "49";
+export const APP_REV = "50";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -2192,7 +2192,9 @@ function sortPhotosByName() {
   );
   renderPhotoList();
   paintPreview($("player")?.currentTime || 0);
-  setStatus("Photos sorted by file name (01, 02, 03…).", "ok");
+  const names = videoState.photos.map((p) => p.name).slice(0, 4).join(" → ");
+  if ($("photoName")) $("photoName").textContent = names;
+  setStatus(`Sorted by file name: ${names}`, "ok");
 }
 
 function movePhoto(i, dir) {
@@ -2219,6 +2221,7 @@ function renderPhotoList() {
       return `<div class="photo-item" data-i="${i}">
         <span class="ord drag-handle" draggable="true" title="Drag">≡</span>
         <label class="slot"># <input type="number" min="1" max="${videoState.photos.length}" step="1" value="${i + 1}" data-slot="${i}" /></label>
+        <button type="button" data-go="${i}">Go</button>
         <span class="name">${escapeChip(p.name)}</span>
         <label class="hold">sec <input type="number" min="0.4" max="300" step="0.1" value="${hold}" data-hold="${i}" /></label>
         <button type="button" data-up="${i}" ${i === 0 ? "disabled" : ""} aria-label="Move up">↑</button>
@@ -3412,3 +3415,21 @@ export function initVideoMaker() {
   paintPreview(0);
   videoReady();
 }
+
+document.addEventListener("click", (e) => {
+  const sort = e.target.closest && e.target.closest("#sortPhotos");
+  if (sort) {
+    e.preventDefault();
+    sortPhotosByName();
+    return;
+  }
+  const go = e.target.closest && e.target.closest("button[data-go]");
+  if (!go) return;
+  e.preventDefault();
+  const from = Number(go.dataset.go);
+  const inp = go.parentElement?.querySelector("input[data-slot]");
+  const to = Number(inp?.value) - 1;
+  if (!Number.isFinite(to)) return;
+  movePhotoTo(from, to);
+  setStatus(`Moved to slot ${to + 1}.`, "ok");
+});
