@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 47 · 2026-09-30</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 48 · 2026-10-01</span></h1>
         <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -306,8 +306,10 @@
           <div class="btn-row">
             <label class="inline-check"><input id="photoEven" type="checkbox" /> Split song time evenly</label>
             <button id="evenPhotos" class="secondary" type="button">Even out times</button>
+            <button id="sortPhotos" class="secondary" type="button">Sort by file name</button>
             <button id="clearPhotos" class="ghost" type="button">Clear photos</button>
           </div>
+          <p class="hint">New photos stay in upload order. Type a slot number, drag the row or the filmstrip, or use ↑ ↓.</p>
           <h3 class="subhead">Grok Imagine</h3>
           <p class="hint" style="margin-top:0">Key stays in this browser. Style lock keeps a whole set looking like one shoot. Preview first, then Keep. No-text is added for you. Key: <a href="https://console.x.ai/" target="_blank" rel="noopener">console.x.ai</a></p>
           <label>xAI API key
@@ -421,6 +423,9 @@
             <option value="Bangers">Bangers</option>
             <option value="IBM Plex Sans">IBM Plex Sans</option>
           </select>
+        </label>
+        <label>Lyric size %
+          <input id="lyricSize" type="number" min="55" max="240" step="5" value="100" />
         </label>
         <label>Text look
           <select id="textLook">

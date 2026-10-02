@@ -348,3 +348,9 @@ textarea.release-copy.short-copy { min-height: 72px; }
   .app { padding-bottom: 140px; }
   .tap-pad button { min-height: 72px; }
 }
+
+.photo-item .slot { display:flex; align-items:center; gap:4px; font-size:0.75rem; color:var(--muted); }
+.photo-item .slot input { width:52px; }
+.photo-item .drag-handle { cursor:grab; opacity:0.7; }
+.photo-item.dragging { opacity:0.45; }
+.photo-item.over { outline:1px solid #2ee6a6; }

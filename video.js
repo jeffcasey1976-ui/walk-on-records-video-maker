@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "46";
+export const APP_REV = "48";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -650,8 +650,9 @@ function drawLyrics(ctx, w, h, t, tight) {
 
   const padX = Math.max(12, bandW * 0.06);
   const maxWidth = bandW - padX * 2;
-  const baseSize = tight ? Math.max(22, Math.round(h * 0.026)) : Math.max(22, Math.round(h * 0.028));
-  const activeSize = tight ? Math.max(28, Math.round(h * 0.038)) : Math.max(26, Math.round(h * 0.036));
+  const sizeScale = Math.max(0.55, Math.min(2.4, Number($("lyricSize")?.value || 100) / 100));
+  const baseSize = tight ? Math.max(18, Math.round(h * 0.026 * sizeScale)) : Math.max(18, Math.round(h * 0.028 * sizeScale));
+  const activeSize = tight ? Math.max(22, Math.round(h * 0.038 * sizeScale)) : Math.max(22, Math.round(h * 0.036 * sizeScale));
   const lineGap = tight ? 1.12 : 1.18;
   const textX = align === "left" ? bandX + padX : align === "right" ? bandX + bandW - padX : bandX + bandW / 2;
   ctx.textAlign = align === "left" ? "left" : align === "right" ? "right" : "center";
@@ -2172,6 +2173,28 @@ function evenOutPhotoTimes() {
   setStatus(`Each of ${n} photos shows ${each}s (song ÷ photos).`, "ok");
 }
 
+function movePhotoTo(from, to) {
+  const arr = videoState.photos;
+  if (!arr.length) return;
+  from = Number(from);
+  to = Math.max(0, Math.min(arr.length - 1, Number(to)));
+  if (!Number.isFinite(from) || from < 0 || from >= arr.length || from === to) return;
+  const [item] = arr.splice(from, 1);
+  arr.splice(to, 0, item);
+  renderPhotoList();
+  paintPreview($("player")?.currentTime || 0);
+}
+
+function sortPhotosByName() {
+  if (videoState.photos.length < 2) return setStatus("Add at least two photos to sort.", "error");
+  videoState.photos.sort((a, b) =>
+    String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" })
+  );
+  renderPhotoList();
+  paintPreview($("player")?.currentTime || 0);
+  setStatus("Photos sorted by file name (01, 02, 03…).", "ok");
+}
+
 function movePhoto(i, dir) {
   const j = i + dir;
   if (j < 0 || j >= videoState.photos.length) return;
@@ -2193,8 +2216,9 @@ function renderPhotoList() {
   el.innerHTML = videoState.photos
     .map((p, i) => {
       const hold = Math.max(0.4, Number(p.hold) || fallback);
-      return `<div class="photo-item" data-i="${i}">
-        <span class="ord">${i + 1}</span>
+      return `<div class="photo-item" data-i="${i}" draggable="true">
+        <span class="ord drag-handle" title="Drag">≡</span>
+        <label class="slot"># <input type="number" min="1" max="${videoState.photos.length}" step="1" value="${i + 1}" data-slot="${i}" /></label>
         <span class="name">${escapeChip(p.name)}</span>
         <label class="hold">sec <input type="number" min="0.4" max="300" step="0.1" value="${hold}" data-hold="${i}" /></label>
         <button type="button" data-up="${i}" ${i === 0 ? "disabled" : ""} aria-label="Move up">↑</button>
@@ -2212,6 +2236,32 @@ function renderPhotoList() {
       renderPhotoList();
       videoReady();
       paintPreview($("player").currentTime || 0);
+    });
+  });
+  el.querySelectorAll("input[data-slot]").forEach((inp) => {
+    inp.addEventListener("change", () => {
+      const from = Number(inp.dataset.slot);
+      const to = Number(inp.value) - 1;
+      movePhotoTo(from, to);
+    });
+    inp.addEventListener("click", (e) => e.stopPropagation());
+  });
+  el.querySelectorAll(".photo-item").forEach((row) => {
+    row.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", row.dataset.i);
+      row.classList.add("dragging");
+    });
+    row.addEventListener("dragend", () => row.classList.remove("dragging"));
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      row.classList.add("over");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("over"));
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      row.classList.remove("over");
+      const from = Number(e.dataTransfer.getData("text/plain"));
+      movePhotoTo(from, Number(row.dataset.i));
     });
   });
   el.querySelectorAll("button[data-up]").forEach((btn) => {
@@ -3059,6 +3109,7 @@ export function initVideoMaker() {
     if ($(id)) $(id).addEventListener("change", () => videoReady());
   });
   if ($("evenPhotos")) $("evenPhotos").addEventListener("click", evenOutPhotoTimes);
+  if ($("sortPhotos")) $("sortPhotos").addEventListener("click", sortPhotosByName);
   if ($("photoEven")) {
     $("photoEven").addEventListener("change", () => paintPreview($("player")?.currentTime || 0));
   }
@@ -3145,7 +3196,7 @@ export function initVideoMaker() {
     setStatus("Watermark removed (including the saved copy).");
   });
 
-  ["aspect", "quality", "photoHold", "photoFade", "photoTrans", "photoMotion", "photoMotionAmt", "photoEven", "vizMode", "vizPlace", "vizTheme", "vizSens", "karaokeStyle", "safeZone", "textLook", "lyricPreset", "lyricTop", "lyricHeight", "lyricWidth", "lyricAlign", "lyricShade", "lyricFont", "songTitle", "songArtist", "songAlbum", "titleFont", "titleSize", "introSec", "introDim", "endSec", "endText", "endPos", "endSize", "endX", "endY", "endTextPos", "endDim", "titleFloat", "shortStart", "shortEnd", "wmSize", "wmOpacity", "wmPos", "ytTitle", "ytDescription", "ytChapters", "ytHashtags", "releaseFolder"].forEach((id) => {
+  ["aspect", "quality", "photoHold", "photoFade", "photoTrans", "photoMotion", "photoMotionAmt", "photoEven", "vizMode", "vizPlace", "vizTheme", "vizSens", "karaokeStyle", "safeZone", "textLook", "lyricPreset", "lyricTop", "lyricHeight", "lyricWidth", "lyricAlign", "lyricShade", "lyricFont", "lyricSize", "songTitle", "songArtist", "songAlbum", "titleFont", "titleSize", "introSec", "introDim", "endSec", "endText", "endPos", "endSize", "endX", "endY", "endTextPos", "endDim", "titleFloat", "shortStart", "shortEnd", "wmSize", "wmOpacity", "wmPos", "ytTitle", "ytDescription", "ytChapters", "ytHashtags", "releaseFolder"].forEach((id) => {
     const el = $(id);
     if (!el) return;
     const refresh = () => {
