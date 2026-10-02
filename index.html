@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 48 · 2026-10-01</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 49 · 2026-10-01</span></h1>
         <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -306,7 +306,7 @@
           <div class="btn-row">
             <label class="inline-check"><input id="photoEven" type="checkbox" /> Split song time evenly</label>
             <button id="evenPhotos" class="secondary" type="button">Even out times</button>
-            <button id="sortPhotos" class="secondary" type="button">Sort by file name</button>
+            <button id="sortPhotos" class="secondary" type="button" onclick="window.worSortPhotos && window.worSortPhotos()">Sort by file name</button>
             <button id="clearPhotos" class="ghost" type="button">Clear photos</button>
           </div>
           <p class="hint">New photos stay in upload order. Type a slot number, drag the row or the filmstrip, or use ↑ ↓.</p>

@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "48";
+export const APP_REV = "49";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -2216,8 +2216,8 @@ function renderPhotoList() {
   el.innerHTML = videoState.photos
     .map((p, i) => {
       const hold = Math.max(0.4, Number(p.hold) || fallback);
-      return `<div class="photo-item" data-i="${i}" draggable="true">
-        <span class="ord drag-handle" title="Drag">≡</span>
+      return `<div class="photo-item" data-i="${i}">
+        <span class="ord drag-handle" draggable="true" title="Drag">≡</span>
         <label class="slot"># <input type="number" min="1" max="${videoState.photos.length}" step="1" value="${i + 1}" data-slot="${i}" /></label>
         <span class="name">${escapeChip(p.name)}</span>
         <label class="hold">sec <input type="number" min="0.4" max="300" step="0.1" value="${hold}" data-hold="${i}" /></label>
@@ -2239,19 +2239,31 @@ function renderPhotoList() {
     });
   });
   el.querySelectorAll("input[data-slot]").forEach((inp) => {
-    inp.addEventListener("change", () => {
+    const apply = () => {
       const from = Number(inp.dataset.slot);
       const to = Number(inp.value) - 1;
+      if (!Number.isFinite(to)) return;
       movePhotoTo(from, to);
-    });
+      setStatus(`Moved to slot ${to + 1}.`, "ok");
+    };
     inp.addEventListener("click", (e) => e.stopPropagation());
+    inp.addEventListener("pointerdown", (e) => e.stopPropagation());
+    inp.addEventListener("change", apply);
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        apply();
+      }
+    });
+  });
+  el.querySelectorAll(".drag-handle").forEach((handle) => {
+    handle.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", handle.parentElement.dataset.i);
+      handle.parentElement.classList.add("dragging");
+    });
+    handle.addEventListener("dragend", () => handle.parentElement.classList.remove("dragging"));
   });
   el.querySelectorAll(".photo-item").forEach((row) => {
-    row.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/plain", row.dataset.i);
-      row.classList.add("dragging");
-    });
-    row.addEventListener("dragend", () => row.classList.remove("dragging"));
     row.addEventListener("dragover", (e) => {
       e.preventDefault();
       row.classList.add("over");
@@ -3014,6 +3026,8 @@ async function renderVideo(opts = {}) {
 }
 
 export function initVideoMaker() {
+  window.worSortPhotos = sortPhotosByName;
+  if ($("sortPhotos")) $("sortPhotos").onclick = () => sortPhotosByName();
   bindMultiDrop($("photoDrop"), $("photoFile"), (files) => addPhotos(files));
   bindMultiDrop($("loopDrop"), $("loopFile"), (files) => setLoopVideo(files[0]));
   bindMultiDrop($("wmDrop"), $("wmFile"), (files) => setWatermarkFromFile(files[0], $("wmSave").checked));
