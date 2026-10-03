@@ -361,17 +361,27 @@ function applyCapcutTimes() {
   state.lines = parseLyrics(lyricsEl.value);
   if (!state.lines.length) return setStatus("Add the correct lyrics first.", "error");
   if (!state.capcut.length) return setStatus("Drop an SRT first.", "error");
-  const mapped = spreadLyricsAcrossSrt(state.lines, state.capcut);
+  const lyrics = state.lines.map((l) => String(l).trim()).filter(Boolean);
+  const sameCount = lyrics.length === state.capcut.length;
+  const mapped = sameCount
+    ? lyrics.map((text, i) => ({
+        text,
+        start: Number(state.capcut[i].start),
+        end: Number(state.capcut[i].end),
+      }))
+    : spreadLyricsAcrossSrt(lyrics, state.capcut);
   if (!mapped.length) return setStatus("Could not map lyrics onto that SRT.", "error");
   state.cues = mapped.map((c) => ({ text: c.text, start: c.start, end: c.end }));
-  snapCues();
+  if (!sameCount) snapCues();
   state.active = 0;
   renderCues();
   renderCurrent();
   const first = fmtClock(state.cues[0].start);
   const last = fmtClock(state.cues[state.cues.length - 1].end);
   setStatus(
-    `SRT clocks only: ${state.capcut.length} windows → ${state.cues.length} lyric lines (${first}–${last}). Words are yours.`,
+    sameCount
+      ? `Copied ${state.cues.length} SRT clocks exactly, gaps kept (${first}–${last}).`
+      : `Line counts differ (${state.capcut.length} SRT, ${state.cues.length} lyrics), so times were spread (${first}–${last}).`,
     "ok"
   );
 }
