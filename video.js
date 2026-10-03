@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "52";
+export const APP_REV = "53";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -704,7 +704,7 @@ function drawLyrics(ctx, w, h, t, tight) {
     const size = plain ? baseSize : active ? activeSize : baseSize;
     const karaoke = !plain && ($("karaokeStyle")?.value || "off") !== "off";
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = plain ? Math.min(1, edgeFadeTop * edgeFadeBot) : alpha;
     if (active && karaoke) {
       const style = $("karaokeStyle").value;
       drawKaraokeLine(ctx, cues[i], t, textX, center - size * 0.2, size, lineGap, maxWidth, align, family, style);
@@ -3227,6 +3227,7 @@ export function initVideoMaker() {
     const refresh = () => {
       if (id === "lyricPreset") applyLyricPreset();
       if (id === "lyricFont") ensureLyricFont().then(() => paintPreview($("player").currentTime || 0));
+      if (id === "textLook" && $("textLook")?.value === "plain" && $("karaokeStyle")) $("karaokeStyle").value = "off";
       if (id === "lyricTop" || id === "lyricHeight") {
         if ($("lyricPreset")) $("lyricPreset").value = "custom";
         if ($("lyricTop")) $("lyricTop").disabled = false;

@@ -1463,9 +1463,26 @@ async function openProjectById(id) {
 
 async function refreshProjectList() {
   const root = $("projList");
-  const rows = await listProjects();
+  let rows = await listProjects();
+  const q = ($("projSearch")?.value || "").trim().toLowerCase();
+  const sort = $("projSort")?.value || "newest";
+  if (q) {
+    rows = rows.filter((p) =>
+      [p.name, p.audioName, p.artist, p.title, p.album]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+  }
+  rows.sort((a, b) => {
+    if (sort === "name") return String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
+    const da = a.updated || 0;
+    const db = b.updated || 0;
+    return sort === "oldest" ? da - db : db - da;
+  });
   if (!rows.length) {
-    root.innerHTML = `<p class="hint">No saved projects yet. Load files and press Save.</p>`;
+    root.innerHTML = `<p class="hint">${q ? "No projects match that search." : "No saved projects yet. Load files and press Save."}</p>`;
     return;
   }
   root.innerHTML = rows
@@ -1654,6 +1671,8 @@ function initProjects() {
     await refreshProjectList();
     $("projDialog").showModal();
   });
+  if ($("projSearch")) $("projSearch").addEventListener("input", () => refreshProjectList());
+  if ($("projSort")) $("projSort").addEventListener("change", () => refreshProjectList());
   $("projClose").addEventListener("click", () => $("projDialog").close());
   if ($("projExport")) {
     $("projExport").addEventListener("click", () => exportCurrentProject().catch((e) => setStatus(String(e.message || e), "error")));

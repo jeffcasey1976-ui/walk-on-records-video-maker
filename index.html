@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 52 · 2026-10-03</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 53 · 2026-10-03</span></h1>
         <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -56,6 +56,18 @@
     <dialog id="projDialog" class="proj-dialog">
       <h3>Projects in this browser</h3>
       <p class="hint" style="margin-top:0">Each save is its own folder of files. Duplicate copies everything and leaves the original untouched. Delete removes it from this browser. Export downloads a <code>.wor.json</code> you can Import on another computer.</p>
+      <div class="row">
+        <label style="margin:0;flex:1">Search
+          <input id="projSearch" type="search" placeholder="Song, artist, file name" />
+        </label>
+        <label style="margin:0">Sort
+          <select id="projSort">
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="name">Name A–Z</option>
+          </select>
+        </label>
+      </div>
       <div id="projList" class="proj-list"></div>
       <div class="btn-row">
         <button id="projClose" class="secondary" type="button">Close</button>
