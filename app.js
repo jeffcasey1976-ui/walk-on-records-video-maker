@@ -1,4 +1,4 @@
-import { initVideoMaker, videoReady, paintPreview, videoSnapshot, applyVideoSnapshot, clearRenderResult } from "./video.js";
+import { initVideoMaker, videoReady, paintPreview, videoSnapshot, applyVideoSnapshot, clearRenderResult, requireReleaseTitle, titledName } from "./video.js";
 import { listProjects, getProject, putProject, deleteProject, newProjectId } from "./projects.js";
 
 export const $ = (id) => document.getElementById(id);
@@ -1053,6 +1053,7 @@ function toLrc() {
 }
 
 function download(name, text) {
+  if (!requireReleaseTitle()) return;
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -1257,8 +1258,8 @@ if ($("markEnd")) $("markEnd").addEventListener("click", markEnd);
 if ($("nudgeEarly")) $("nudgeEarly").addEventListener("click", () => nudgeActive(-0.2));
 if ($("nudgeLate")) $("nudgeLate").addEventListener("click", () => nudgeActive(0.2));
 
-$("downloadSrt").addEventListener("click", () => download(`${state.fileName}.srt`, toSrt()));
-$("downloadLrc").addEventListener("click", () => download(`${state.fileName}.lrc`, toLrc()));
+$("downloadSrt").addEventListener("click", () => download(titledName("srt"), toSrt()));
+$("downloadLrc").addEventListener("click", () => download(titledName("lrc"), toLrc()));
 $("copySrt").addEventListener("click", async () => {
   await navigator.clipboard.writeText(toSrt());
   setStatus("SRT copied.", "ok");

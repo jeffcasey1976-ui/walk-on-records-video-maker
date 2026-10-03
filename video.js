@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "56";
+export const APP_REV = "57";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1084,9 +1084,10 @@ function paintShortDownloads() {
     btn.className = "accent";
     btn.textContent = `Download Short ${row.index} (${(row.blob.size / 1e6).toFixed(1)} MB)`;
     btn.addEventListener("click", () => {
+      if (!requireReleaseTitle()) return;
       const a = document.createElement("a");
       a.href = URL.createObjectURL(row.blob);
-      a.download = row.name;
+      a.download = titledName(row.name.replace(/^.*?-/, ""));
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     });
@@ -1279,7 +1280,7 @@ function drawEndCard(ctx, w, h, t, timelineDur, forced) {
       dw = dh * (iw / Math.max(1, ih));
     }
   }
-  const label = textPos === "off" ? "" : meta.text || "Like & Subscribe";
+  const label = textPos === "off" ? "" : meta.text;
   const fontSize = label ? Math.max(20, Math.round(h * (forced ? 0.036 : 0.03))) : 0;
   const textH = label ? fontSize * 1.4 : 0;
   const stackH = dh + (dh && textH ? pad * 0.4 : 0) + textH;
@@ -2229,9 +2230,11 @@ export async function postReleaseToYoutube() {
 }
 
 export function downloadRender() {
+  if (!requireReleaseTitle()) return;
   const main = videoState.main || videoState.result;
   if (!main?.blob) return setStatus("No main video yet. Render the full song first.", "error");
-  downloadBlob(main.name, main.blob);
+  const name = titledName(main.name.replace(/^.*?-/, ""));
+  downloadBlob(name, main.blob);
   setStatus("Main video download started.", "ok");
 }
 
@@ -2251,6 +2254,25 @@ function pickMime() {
 function extForMime(mime) {
   if (mime.includes("mp4")) return "mp4";
   return "webm";
+}
+
+export function releaseTitle() {
+  return ($("songTitle")?.value || "").trim();
+}
+
+export function requireReleaseTitle() {
+  const title = releaseTitle();
+  if (!title) {
+    setStatus("Enter a title before download. It is added to every file name.", "error");
+    $("songTitle")?.focus();
+    return "";
+  }
+  return title;
+}
+
+export function titledName(suffix) {
+  const title = (releaseTitle() || "untitled").replace(/[^\w\s.-]+/g, "").trim().replace(/\s+/g, "-");
+  return `${title}-${suffix}`;
 }
 
 function downloadBlob(name, blob) {
@@ -2928,6 +2950,7 @@ async function renderAutoShorts() {
 
 async function renderVideo(opts = {}) {
   if (videoState.exporting) return null;
+  if (!requireReleaseTitle()) return null;
   if (!hasBackground() || !(state.audioBuffer || (state.duration && $("player").src))) {
     setStatus("Need audio plus photos or a loop video. Lyrics are optional.", "error");
     return null;
@@ -3103,7 +3126,7 @@ async function renderVideo(opts = {}) {
   const blob = new Blob(chunks, { type: outMime });
   const ext = extForMime(outMime);
   const tag = `${pack ? `short${opts.index ? "-" + opts.index : ""}-9x16` : $("aspect").value.replace(":", "x")}${amount < 1 ? `-draft${Math.round(amount * 100)}` : ""}`;
-  const name = `${state.fileName || "video"}-${tag}.${ext}`;
+  const name = titledName(`${tag}.${ext}`);
   const extra = {
     aspect: pack ? "9:16" : $("aspect")?.value || "9:16",
     w,
