@@ -17,7 +17,7 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 55 · 2026-10-03</span></h1>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 56 · 2026-10-03</span></h1>
         <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
       </div>
       <div class="badge">Walk On Records</div>
@@ -506,6 +506,17 @@
         </label>
         <label>Dim behind title
           <input id="introDim" type="number" min="0" max="0.9" step="0.05" value="0" />
+        </label>
+        <label>Title style
+          <select id="titleStyle">
+            <option value="plain" selected>Plain</option>
+            <option value="bar">Bar + underline</option>
+            <option value="stack">Stacked words</option>
+            <option value="rule">Title / rule / subtitle</option>
+            <option value="box">Outline box</option>
+            <option value="sticker">Sticker block</option>
+            <option value="frame">Framed label</option>
+          </select>
         </label>
         <label>Title font
           <select id="titleFont">

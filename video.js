@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "55";
+export const APP_REV = "56";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1113,6 +1113,89 @@ function updateShortHint() {
   el.textContent = `Hook ${formatTimeField(r.start)} → ${formatTimeField(r.end)} (${r.len.toFixed(1)}s). Title and Like & Subscribe overlay the first and last ~2 seconds — music starts immediately.${note}`;
 }
 
+function drawTitleStyle(ctx, w, h, y, title, artist, album, a) {
+  const style = $("titleStyle")?.value || "plain";
+  const family = titleFontStack();
+  const size = titleTypeSize(h);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.globalAlpha = a;
+  if (style === "bar") {
+    const barW = Math.max(10, w * 0.012);
+    ctx.fillStyle = "#2ee6a6";
+    ctx.fillRect(w * 0.16, y - size * 0.55, barW, size * 1.1);
+    ctx.fillStyle = "#fff";
+    ctx.font = `800 ${size}px ${family}`;
+    ctx.fillText(title, w / 2, y);
+    ctx.fillRect(w * 0.22, y + size * 0.62, w * 0.56, Math.max(3, size * 0.06));
+    return y + size * 1.3;
+  }
+  if (style === "stack") {
+    const words = title.split(/\s+/).slice(0, 4);
+    let yy = y - size * (words.length - 1) * 0.45;
+    ctx.fillStyle = "#fff";
+    ctx.font = `700 ${Math.round(size * 0.92)}px ${family}`;
+    words.forEach((word) => {
+      ctx.fillText(word, w / 2, yy);
+      yy += size * 0.95;
+    });
+    return yy;
+  }
+  if (style === "rule") {
+    ctx.fillStyle = "#fff";
+    ctx.font = `800 ${size}px ${family}`;
+    ctx.fillText(title.toUpperCase(), w / 2, y);
+    ctx.fillRect(w * 0.34, y + size * 0.55, w * 0.32, Math.max(2, size * 0.045));
+    if (album || artist) {
+      ctx.font = `500 ${Math.round(size * 0.38)}px ${family}`;
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.fillText(album || artist, w / 2, y + size * 0.95);
+    }
+    return y + size * 1.4;
+  }
+  if (style === "box") {
+    ctx.font = `800 ${Math.round(size * 0.82)}px ${family}`;
+    const tw = Math.min(w * 0.8, ctx.measureText(title).width + size * 0.8);
+    const th = size * 1.15;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = Math.max(3, size * 0.06);
+    ctx.strokeRect((w - tw) / 2, y - th / 2, tw, th);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(title, w / 2, y);
+    return y + th;
+  }
+  if (style === "sticker") {
+    ctx.font = `800 ${Math.round(size * 0.78)}px ${family}`;
+    const tw = Math.min(w * 0.82, ctx.measureText(title).width + size);
+    const th = size * 1.25;
+    ctx.fillStyle = "#f4f1ea";
+    ctx.fillRect((w - tw) / 2, y - th / 2, tw, th);
+    ctx.fillStyle = "#142033";
+    ctx.fillText(title, w / 2, y);
+    return y + th;
+  }
+  if (style === "frame") {
+    ctx.font = `700 ${Math.round(size * 0.7)}px ${family}`;
+    const tw = Math.min(w * 0.72, ctx.measureText(title).width + size * 1.4);
+    const th = size * 1.35;
+    ctx.strokeStyle = "#e37b2d";
+    ctx.lineWidth = Math.max(4, size * 0.07);
+    ctx.strokeRect((w - tw) / 2, y - th / 2, tw, th);
+    ctx.fillStyle = "#f7f3ea";
+    ctx.fillRect((w - tw) / 2 + 6, y - th / 2 + 6, tw - 12, th - 12);
+    ctx.fillStyle = "#1b1b1b";
+    ctx.fillText(title, w / 2, y);
+    return y + th;
+  }
+  ctx.font = `700 ${size}px ${family}`;
+  const lines = wrapText(ctx, title, w * 0.86);
+  lines.forEach((line) => {
+    drawFancyText(ctx, line, w / 2, y, { size, look: textLook(), align: "center", active: true });
+    y += size * 1.12;
+  });
+  return y + size * 0.2;
+}
+
 function drawIntroCard(ctx, w, h, t, forced) {
   const meta = introMeta();
   const seconds = forced
@@ -1140,18 +1223,9 @@ function drawIntroCard(ctx, w, h, t, forced) {
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = Math.round(h * 0.02);
   let y = h * 0.38;
-  if (title) {
-    const size = titleTypeSize(h);
-    ctx.font = `700 ${size}px ${family}`;
-    const lines = wrapText(ctx, title, w * 0.86);
-    lines.forEach((line) => {
-      ctx.globalAlpha = a;
-      drawFancyText(ctx, line, w / 2, y, { size, look: textLook(), align: "center", active: true });
-      y += size * 1.12;
-    });
-    y += size * 0.2;
-  }
-  if (artist) {
+  if (title) y = drawTitleStyle(ctx, w, h, y, title, artist, album, a);
+  else y = h * 0.42;
+  if (artist && ($("titleStyle")?.value || "plain") !== "rule") {
     const size = Math.max(18, Math.round(h * 0.028));
     ctx.font = `600 ${size}px ${family}`;
     ctx.fillStyle = `rgba(232,237,247,${0.92 * a})`;
@@ -3248,7 +3322,7 @@ export function initVideoMaker() {
     setStatus("Watermark removed (including the saved copy).");
   });
 
-  ["aspect", "quality", "photoHold", "photoFade", "photoTrans", "photoMotion", "photoMotionAmt", "photoEven", "vizMode", "vizPlace", "vizTheme", "vizSens", "karaokeStyle", "safeZone", "textLook", "lyricPreset", "lyricTop", "lyricHeight", "lyricWidth", "lyricAlign", "lyricShade", "lyricFont", "lyricSize", "songTitle", "songArtist", "songAlbum", "titleFont", "titleSize", "introSec", "introDim", "endSec", "endText", "endPos", "endSize", "endX", "endY", "endTextPos", "endDim", "titleFloat", "shortStart", "shortEnd", "wmSize", "wmOpacity", "wmPos", "ytTitle", "ytDescription", "ytChapters", "ytHashtags", "releaseFolder"].forEach((id) => {
+  ["aspect", "quality", "photoHold", "photoFade", "photoTrans", "photoMotion", "photoMotionAmt", "photoEven", "vizMode", "vizPlace", "vizTheme", "vizSens", "karaokeStyle", "safeZone", "textLook", "lyricPreset", "lyricTop", "lyricHeight", "lyricWidth", "lyricAlign", "lyricShade", "lyricFont", "lyricSize", "songTitle", "songArtist", "songAlbum", "titleFont", "titleSize", "titleStyle", "introSec", "introDim", "endSec", "endText", "endPos", "endSize", "endX", "endY", "endTextPos", "endDim", "titleFloat", "shortStart", "shortEnd", "wmSize", "wmOpacity", "wmPos", "ytTitle", "ytDescription", "ytChapters", "ytHashtags", "releaseFolder"].forEach((id) => {
     const el = $(id);
     if (!el) return;
     const refresh = () => {
