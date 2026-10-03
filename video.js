@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "50";
+export const APP_REV = "52";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -444,6 +444,13 @@ function drawFancyText(ctx, text, x, y, opts = {}) {
   ctx.textBaseline = opts.baseline || "middle";
   ctx.lineJoin = "round";
   ctx.miterLimit = 2;
+  if (look === "plain") {
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.96)";
+    ctx.fillText(text, x, y);
+    ctx.restore();
+    return;
+  }
   if (look === "neon") {
     ctx.shadowColor = active ? "rgba(255,60,200,0.9)" : "rgba(80,180,255,0.45)";
     ctx.shadowBlur = size * 0.55;
@@ -693,15 +700,16 @@ function drawLyrics(ctx, w, h, t, tight) {
     const alpha = appear * edgeFadeTop * edgeFadeBot;
     if (alpha < 0.03) continue;
 
-    const size = active ? activeSize : baseSize;
-    const karaoke = ($("karaokeStyle")?.value || "off") !== "off";
+    const plain = textLook() === "plain";
+    const size = plain ? baseSize : active ? activeSize : baseSize;
+    const karaoke = !plain && ($("karaokeStyle")?.value || "off") !== "off";
     ctx.save();
     ctx.globalAlpha = alpha;
     if (active && karaoke) {
       const style = $("karaokeStyle").value;
       drawKaraokeLine(ctx, cues[i], t, textX, center - size * 0.2, size, lineGap, maxWidth, align, family, style);
     } else {
-      ctx.font = `${active ? 700 : 500} ${size}px ${family}`;
+      ctx.font = `${plain ? 500 : active ? 700 : 500} ${size}px ${family}`;
       const lines = wrapText(ctx, cues[i].text, maxWidth);
       const blockHeight = lines.length * size * lineGap;
       let y = center - blockHeight / 2 + size * 0.5;
