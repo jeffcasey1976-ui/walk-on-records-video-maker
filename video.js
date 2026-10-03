@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "54";
+export const APP_REV = "55";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1916,6 +1916,17 @@ async function downloadCopyZip() {
   setStatus(how === "folder" ? `Wrote youtube + thumbs under ${folder}.` : "Downloaded youtube + thumbs zip.", "ok");
 }
 
+function existingMaster(aspect) {
+  const saved = aspect === "16:9" ? videoState.masters.wide : videoState.masters.tall;
+  if (saved?.blob) return saved;
+  const main = videoState.main || videoState.result;
+  if (!main?.blob) return null;
+  const name = String(main.name || "");
+  const tag = aspect === "16:9" ? "16x9" : "9x16";
+  if (main.aspect === aspect || name.includes(tag)) return main;
+  return null;
+}
+
 async function buildReleaseDesk() {
   if (videoState.exporting) return;
   if (!hasBackground() || !(state.audioBuffer || (state.duration && $("player").src))) {
@@ -1935,7 +1946,7 @@ async function buildReleaseDesk() {
   const aspectEl = $("aspect");
   const prev = aspectEl.value;
   const videos = [];
-  let wide = reuse && videoState.masters.wide?.blob ? videoState.masters.wide : null;
+  let wide = reuse ? existingMaster("16:9") : null;
   if (!wide) {
     aspectEl.value = "16:9";
     sizePreviewCanvas();
@@ -1948,7 +1959,7 @@ async function buildReleaseDesk() {
     sizePreviewCanvas();
     return;
   }
-  let tall = reuse && videoState.masters.tall?.blob ? videoState.masters.tall : null;
+  let tall = reuse ? existingMaster("9:16") : null;
   if (!tall) {
     aspectEl.value = "9:16";
     sizePreviewCanvas();
@@ -1959,7 +1970,8 @@ async function buildReleaseDesk() {
   aspectEl.value = prev;
   sizePreviewCanvas();
   const dur = mediaDuration();
-  if (dur > 120 && !videoState.cancel && !((videoState.shorts || []).length >= 3 && reuse)) await renderAutoShorts();
+  const haveShorts = (videoState.shorts || []).filter((s) => s?.blob);
+  if (dur > 120 && !videoState.cancel && !(reuse && haveShorts.length >= 3)) await renderAutoShorts();
   (videoState.shorts || []).forEach((s, i) => {
     if (s?.blob) videos.push({ path: `${folder}/video/short-${s.index || i + 1}-9x16.${extForMime(s.blob.type)}`, blob: s.blob });
   });
@@ -2005,9 +2017,18 @@ export function videoSnapshot() {
       ? {
           name: (videoState.main || videoState.result).name,
           mime: (videoState.main || videoState.result).mime,
+          aspect: (videoState.main || videoState.result).aspect,
           blob: (videoState.main || videoState.result).blob,
         }
       : null,
+    masters: {
+      wide: videoState.masters.wide?.blob
+        ? { name: videoState.masters.wide.name, mime: videoState.masters.wide.mime, aspect: "16:9", blob: videoState.masters.wide.blob }
+        : null,
+      tall: videoState.masters.tall?.blob
+        ? { name: videoState.masters.tall.name, mime: videoState.masters.tall.mime, aspect: "9:16", blob: videoState.masters.tall.blob }
+        : null,
+    },
     shorts: (videoState.shorts || []).map((s) => ({
       name: s.name,
       blob: s.blob,
@@ -2067,7 +2088,13 @@ export async function applyVideoSnapshot(snap) {
     await setEndLogoFromFile(file);
   }
   if (snap?.render?.blob) {
-    setMainResult(snap.render.blob, snap.render.name, snap.render.mime);
+    setMainResult(snap.render.blob, snap.render.name, snap.render.mime, { aspect: snap.render.aspect });
+  }
+  if (snap?.masters?.wide?.blob) {
+    videoState.masters.wide = { ...snap.masters.wide, aspect: "16:9" };
+  }
+  if (snap?.masters?.tall?.blob) {
+    videoState.masters.tall = { ...snap.masters.tall, aspect: "9:16" };
   }
   if (snap?.shorts?.length) {
     videoState.shorts = snap.shorts.filter((s) => s?.blob);
@@ -3011,14 +3038,15 @@ async function renderVideo(opts = {}) {
     short: !!pack,
   };
   setRenderResult(blob, name, outMime, !!opts.short, extra);
-  if (opts.batch && !opts.short) {
-    if (extra.aspect === "16:9") videoState.masters.wide = { blob, name, mime: outMime, ...extra };
-    if (extra.aspect === "9:16") videoState.masters.tall = { blob, name, mime: outMime, ...extra };
-  }
   if (opts.short && !opts.batch) {
     videoState.shorts = videoState.shorts || [];
     videoState.shorts.push({ blob, name, index: videoState.shorts.length + 1 });
     paintShortDownloads();
+  }
+  if (!opts.short && amount >= 1) {
+    const master = { blob, name, mime: outMime, ...extra };
+    if (extra.aspect === "16:9") videoState.masters.wide = master;
+    if (extra.aspect === "9:16" && !opts.short) videoState.masters.tall = master;
   }
   window.dispatchEvent(new CustomEvent("wavesrt-rendered"));
   setProgress(1);
