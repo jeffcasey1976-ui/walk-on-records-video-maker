@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "53";
+export const APP_REV = "54";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -700,16 +700,15 @@ function drawLyrics(ctx, w, h, t, tight) {
     const alpha = appear * edgeFadeTop * edgeFadeBot;
     if (alpha < 0.03) continue;
 
-    const plain = textLook() === "plain";
-    const size = plain ? baseSize : active ? activeSize : baseSize;
-    const karaoke = !plain && ($("karaokeStyle")?.value || "off") !== "off";
+    const karaokeOn = ["hold", "pop", "bounce", "slide"].includes($("karaokeStyle")?.value || "");
+    const size = karaokeOn && active ? activeSize : baseSize;
     ctx.save();
-    ctx.globalAlpha = plain ? Math.min(1, edgeFadeTop * edgeFadeBot) : alpha;
-    if (active && karaoke) {
+    ctx.globalAlpha = karaokeOn ? alpha : Math.min(1, edgeFadeTop * edgeFadeBot);
+    if (active && karaokeOn) {
       const style = $("karaokeStyle").value;
       drawKaraokeLine(ctx, cues[i], t, textX, center - size * 0.2, size, lineGap, maxWidth, align, family, style);
     } else {
-      ctx.font = `${plain ? 500 : active ? 700 : 500} ${size}px ${family}`;
+      ctx.font = `500 ${size}px ${family}`;
       const lines = wrapText(ctx, cues[i].text, maxWidth);
       const blockHeight = lines.length * size * lineGap;
       let y = center - blockHeight / 2 + size * 0.5;
@@ -1536,7 +1535,7 @@ const LOOK_PRESETS = {
     vizTheme: "neon",
     vizSens: "1.3",
     textLook: "neon",
-    karaokeStyle: "pop",
+    karaokeStyle: "off",
     photoMotion: "auto",
     photoMotionAmt: "1",
     titleFloat: "off",
@@ -1559,7 +1558,7 @@ const LOOK_PRESETS = {
     vizTheme: "gold",
     vizSens: "1.4",
     textLook: "poster",
-    karaokeStyle: "bounce",
+    karaokeStyle: "off",
     photoMotion: "in",
     photoMotionAmt: "0.65",
     titleFloat: "song",
@@ -1582,7 +1581,7 @@ const LOOK_PRESETS = {
     vizTheme: "gold",
     vizSens: "1",
     textLook: "clean",
-    karaokeStyle: "hold",
+    karaokeStyle: "off",
     photoMotion: "auto",
     photoMotionAmt: "0.65",
     titleFloat: "off",
