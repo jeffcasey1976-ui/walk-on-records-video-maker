@@ -17,8 +17,8 @@
   <main class="app">
     <header class="top">
       <div class="brand">
-        <h1>Walk On Records Video Maker <span class="rev">Rev 58 · 2026-10-04</span></h1>
-        <p>Best path: your lyrics + Auto time from the WAV. An SRT is optional if Whisper misses a line.</p>
+        <h1>Walk On Records Video Maker <span class="rev">Rev 59 · 2026-10-04</span></h1>
+        <p>Best path: drop the SRT you already trust. The video uses those clocks and leaves the title clear until the first line starts.</p>
       </div>
       <div class="badge">Walk On Records</div>
     </header>
@@ -116,7 +116,7 @@
 
     <section class="card" style="margin-top:16px">
       <h2>3. SRT times</h2>
-      <p class="hint" style="margin-top:0">Drop any <code>.srt</code>. The maker keeps those start/end times and puts your lyric words on them.</p>
+      <p class="hint" style="margin-top:0">Drop the SRT you trust. Same line count puts your words on those clocks. A different count keeps the SRT as-is. Lyrics stay off until the first cue, so a title in the video is clear.</p>
       <div id="srtDrop" class="drop">
         <strong>Drop .srt here</strong>
         tap to choose a file
@@ -124,7 +124,7 @@
       </div>
       <input id="srtFile" type="file" accept=".srt,.vtt,text/plain" hidden />
       <div class="btn-row">
-        <button id="capcutBtn" type="button">Apply SRT times to lyrics</button>
+        <button id="capcutBtn" type="button">Use this SRT</button>
         <button id="clearSrt" class="ghost" type="button">Remove SRT</button>
       </div>
     </section>
@@ -438,6 +438,9 @@
         </label>
         <label>Lyric size %
           <input id="lyricSize" type="number" min="55" max="240" step="5" value="100" />
+        </label>
+        <label>Lyrics wait sec
+          <input id="lyricWait" type="number" min="0" max="60" step="0.5" value="0" />
         </label>
         <label>Text look
           <select id="textLook">

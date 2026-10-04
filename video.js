@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "57";
+export const APP_REV = "59";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -283,19 +283,21 @@ function timedCues() {
 }
 
 function scrollPointer(cues, t) {
-  if (!cues.length) return 0;
-  if (t <= cues[0].start) return 0;
+  if (!cues.length) return -1;
+  const wait = Math.max(0, Number($("lyricWait")?.value) || 0);
+  const introHold = introMeta().seconds > 0 && (introMeta().title || introMeta().artist || introMeta().album) ? introMeta().seconds : 0;
+  if (t < Math.max(wait, introHold, cues[0].start)) return -1;
   for (let i = 0; i < cues.length; i++) {
     const c = cues[i];
     const next = cues[i + 1];
     if (t >= c.start && t <= c.end) {
       const frac = (t - c.start) / Math.max(0.05, c.end - c.start);
-      return i + Math.min(1, Math.max(0, frac));
+      return i + Math.min(0.85, Math.max(0, frac));
     }
-    if (next && t > c.end && t < next.start) return i + 1;
-    if (t > c.end && !next) return i + 1;
+    if (next && t > c.end && t < next.start) return -1;
+    if (t > c.end && !next) return -1;
   }
-  return cues.length;
+  return -1;
 }
 
 function photoHolds() {
@@ -677,6 +679,7 @@ function drawLyrics(ctx, w, h, t, tight) {
   });
 
   const pointer = scrollPointer(cues, t);
+  if (pointer < 0) return;
   const idx = Math.min(cues.length - 1, Math.max(0, Math.floor(pointer)));
   const frac = pointer - Math.floor(pointer);
 
@@ -3345,7 +3348,7 @@ export function initVideoMaker() {
     setStatus("Watermark removed (including the saved copy).");
   });
 
-  ["aspect", "quality", "photoHold", "photoFade", "photoTrans", "photoMotion", "photoMotionAmt", "photoEven", "vizMode", "vizPlace", "vizTheme", "vizSens", "karaokeStyle", "safeZone", "textLook", "lyricPreset", "lyricTop", "lyricHeight", "lyricWidth", "lyricAlign", "lyricShade", "lyricFont", "lyricSize", "songTitle", "songArtist", "songAlbum", "titleFont", "titleSize", "titleStyle", "introSec", "introDim", "endSec", "endText", "endPos", "endSize", "endX", "endY", "endTextPos", "endDim", "titleFloat", "shortStart", "shortEnd", "wmSize", "wmOpacity", "wmPos", "ytTitle", "ytDescription", "ytChapters", "ytHashtags", "releaseFolder"].forEach((id) => {
+  ["aspect", "quality", "photoHold", "photoFade", "photoTrans", "photoMotion", "photoMotionAmt", "photoEven", "vizMode", "vizPlace", "vizTheme", "vizSens", "karaokeStyle", "safeZone", "textLook", "lyricPreset", "lyricTop", "lyricHeight", "lyricWidth", "lyricAlign", "lyricShade", "lyricFont", "lyricSize", "lyricWait", "songTitle", "songArtist", "songAlbum", "titleFont", "titleSize", "titleStyle", "introSec", "introDim", "endSec", "endText", "endPos", "endSize", "endX", "endY", "endTextPos", "endDim", "titleFloat", "shortStart", "shortEnd", "wmSize", "wmOpacity", "wmPos", "ytTitle", "ytDescription", "ytChapters", "ytHashtags", "releaseFolder"].forEach((id) => {
     const el = $(id);
     if (!el) return;
     const refresh = () => {
