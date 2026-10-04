@@ -369,10 +369,13 @@ function applyCapcutTimes() {
         start: Number(state.capcut[i].start),
         end: Number(state.capcut[i].end),
       }))
-    : spreadLyricsAcrossSrt(lyrics, state.capcut);
+    : state.capcut.map((c) => ({
+        text: c.text,
+        start: Number(c.start),
+        end: Number(c.end),
+      }));
   if (!mapped.length) return setStatus("Could not map lyrics onto that SRT.", "error");
   state.cues = mapped.map((c) => ({ text: c.text, start: c.start, end: c.end }));
-  if (!sameCount) snapCues();
   state.active = 0;
   renderCues();
   renderCurrent();
@@ -381,7 +384,7 @@ function applyCapcutTimes() {
   setStatus(
     sameCount
       ? `Copied ${state.cues.length} SRT clocks exactly, gaps kept (${first}–${last}).`
-      : `Line counts differ (${state.capcut.length} SRT, ${state.cues.length} lyrics), so times were spread (${first}–${last}).`,
+      : `Kept the SRT as-is (${state.capcut.length} cues, gaps kept). Lyric sheet has ${lyrics.length} lines, so it was not spread over the clocks.`,
     "ok"
   );
 }
