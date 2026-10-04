@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "59";
+export const APP_REV = "60";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -1330,6 +1330,15 @@ function shortPack() {
   return { range, intro, end, duration: range.len };
 }
 
+function lyricsBlocked(t) {
+  const cues = timedCues();
+  const wait = Math.max(0, Number($("lyricWait")?.value) || 0);
+  const intro = introMeta();
+  const titleHold = intro.title || intro.artist || intro.album ? Math.max(intro.seconds, intro.seconds > 0 ? intro.seconds : 0) : 0;
+  const first = cues.length ? cues[0].start : 0;
+  return t < Math.max(wait, titleHold, first);
+}
+
 export function drawFrame(ctx, w, h, t, pack) {
   const mapped = mapShortTime(t, pack);
   const songT = mapped.songT;
@@ -1341,7 +1350,7 @@ export function drawFrame(ctx, w, h, t, pack) {
       drawIntroCard(ctx, w, h, mapped.local, true);
     } else if (mapped.phase === "end") {
       drawEndCard(ctx, w, h, pack.duration - pack.end + mapped.local, pack.duration, true);
-    } else {
+    } else if (!lyricsBlocked(songT)) {
       drawLyrics(ctx, w, h, songT, true);
       if (floatTitleMode() !== "off") drawFloatingTitle(ctx, w, h, songT);
     }
@@ -1351,7 +1360,7 @@ export function drawFrame(ctx, w, h, t, pack) {
   const end = endMeta();
   const inIntro = intro.seconds > 0 && t <= intro.seconds && (intro.title || intro.artist || intro.album);
   const inEnd = end.seconds > 0 && duration > 0 && t >= duration - end.seconds;
-  if (!inIntro && !inEnd) {
+  if (!inIntro && !inEnd && !lyricsBlocked(t)) {
     drawWatermark(ctx, w, h);
     drawLyrics(ctx, w, h, t);
     if (floatTitleMode() !== "off") drawFloatingTitle(ctx, w, h, t);
