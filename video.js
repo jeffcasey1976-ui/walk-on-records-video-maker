@@ -51,7 +51,7 @@ const videoState = {
   masters: { wide: null, tall: null },
 };
 
-export const APP_REV = "60";
+export const APP_REV = "62";
 export const APP_REV_DATE = "2026-09-26";
 
 const FONT_LIST = [
@@ -678,55 +678,31 @@ function drawLyrics(ctx, w, h, t, tight) {
     return lines.length * size * lineGap + Math.round(h * 0.028);
   });
 
-  const pointer = scrollPointer(cues, t);
-  if (pointer < 0) return;
-  const idx = Math.min(cues.length - 1, Math.max(0, Math.floor(pointer)));
-  const frac = pointer - Math.floor(pointer);
-
-  let scrollPx = 0;
-  for (let i = 0; i < idx; i++) scrollPx += heights[i];
-  scrollPx += heights[idx] * frac;
-
-  const focusY = bandTop + bandH * (tight ? 0.46 : 0.42);
-  let acc = 0;
-  for (let i = 0; i < cues.length; i++) {
-    const blockH = heights[i];
-    const center = focusY + (acc + blockH / 2 - scrollPx);
-    acc += blockH;
-    if (center < bandTop - blockH || center > bandBot + blockH) continue;
-    const dist = Math.abs(i - pointer);
-    if (dist > (tight ? 1.15 : 2.6)) continue;
-    const active = dist < 0.55;
-    const appear = Math.max(0, 1 - dist / (tight ? 1.05 : 2.15));
-    const edgeFadeTop = Math.min(1, Math.max(0, (center - bandTop) / Math.max(12, bandH * 0.18)));
-    const edgeFadeBot = Math.min(1, Math.max(0, (bandBot - 8 - center) / Math.max(12, bandH * 0.16)));
-    const alpha = appear * edgeFadeTop * edgeFadeBot;
-    if (alpha < 0.03) continue;
-
-    const karaokeOn = ["hold", "pop", "bounce", "slide"].includes($("karaokeStyle")?.value || "");
-    const size = karaokeOn && active ? activeSize : baseSize;
-    ctx.save();
-    ctx.globalAlpha = karaokeOn ? alpha : Math.min(1, edgeFadeTop * edgeFadeBot);
-    if (active && karaokeOn) {
-      const style = $("karaokeStyle").value;
-      drawKaraokeLine(ctx, cues[i], t, textX, center - size * 0.2, size, lineGap, maxWidth, align, family, style);
-    } else {
-      ctx.font = `500 ${size}px ${family}`;
-      const lines = wrapText(ctx, cues[i].text, maxWidth);
-      const blockHeight = lines.length * size * lineGap;
-      let y = center - blockHeight / 2 + size * 0.5;
-      for (const line of lines) {
-        drawFancyText(ctx, line, textX, y, {
-          size,
-          look: textLook(),
-          align,
-          active,
-        });
-        y += size * lineGap;
-      }
+  const current = cues.find((c) => t >= c.start && t <= c.end);
+  if (!current) return;
+  const center = bandTop + bandH * 0.5;
+  const karaokeOn = ["hold", "pop", "bounce", "slide"].includes($("karaokeStyle")?.value || "");
+  const size = karaokeOn ? activeSize : baseSize;
+  ctx.save();
+  ctx.globalAlpha = 1;
+  if (karaokeOn) {
+    drawKaraokeLine(ctx, current, t, textX, center - size * 0.2, size, lineGap, maxWidth, align, family, $("karaokeStyle").value);
+  } else {
+    ctx.font = `500 ${size}px ${family}`;
+    const lines = wrapText(ctx, current.text, maxWidth);
+    const blockHeight = lines.length * size * lineGap;
+    let y = center - blockHeight / 2 + size * 0.5;
+    for (const line of lines) {
+      drawFancyText(ctx, line, textX, y, {
+        size,
+        look: textLook(),
+        align,
+        active: false,
+      });
+      y += size * lineGap;
     }
-    ctx.restore();
   }
+  ctx.restore();
 }
 
 function vizSettings() {
@@ -867,7 +843,8 @@ function drawPictureLayer(ctx, w, h, t, react) {
   if (vid && vid.readyState >= 2 && (vid.videoWidth || 0) > 0) {
     syncLoopVideo(t, false);
     const { mode } = motionSettings();
-    if (mode === "off") drawCover(ctx, vid, w, h, 1);
+    const videoStill = !mode || mode === "off" || mode === "auto";
+    if (videoStill) drawCover(ctx, vid, w, h, 1);
     else {
       const cycle = Math.max(8, Number($("photoHold").value) || 8);
       const p = (((t % cycle) + cycle) % cycle) / cycle;
@@ -2693,9 +2670,10 @@ async function setLoopVideo(file) {
     vid.pause();
   } catch (_) {}
   $("loopName").textContent = `${file.name} · ${Number.isFinite(vid.duration) ? vid.duration.toFixed(1) + "s loop" : "loop"}`;
+  if ($("photoMotion")) $("photoMotion").value = "off";
   videoReady();
   paintPreview(0);
-  setStatus("Loop video loaded. It will repeat for the length of the song.", "ok");
+  setStatus("Loop video loaded. Still by default — no zoom or pan. Pick a motion if you want one.", "ok");
 }
 
 async function setWatermarkFromFile(file, persist) {
